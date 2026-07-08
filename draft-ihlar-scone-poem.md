@@ -711,7 +711,7 @@ Change Controller:
 : IETF (iesg@ietf.org)
 
 Contact:
-: SCONE Working Group (scone@ietf.org)
+: QUIC Working Group (quic@ietf.org)
 
 Notes:
 : POEM Marker Packet
@@ -730,7 +730,7 @@ Change Controller:
 : IETF (iesg@ietf.org)
 
 Contact:
-: SCONE Working Group (scone@ietf.org)
+: QUIC Working Group (quic@ietf.org)
 
 Notes:
 : POEM Report Packet
@@ -758,7 +758,7 @@ Change Controller:
 : IETF (iesg@ietf.org)
 
 Contact:
-: SCONE Working Group (scone@ietf.org)
+: QUIC Working Group (quic@ietf.org)
 
 Notes:
 : (none)
