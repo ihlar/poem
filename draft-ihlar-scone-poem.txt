@@ -109,9 +109,9 @@ Table of Contents
    15. References
      15.1.  Normative References
      15.2.  Informative References
-   Design Considerations
-     Marker Interval Selection
-     Comparison with Per-Packet Approaches
+   Appendix A.  Design Considerations
+     A.1.  Marker Interval Selection
+     A.2.  Comparison with Per-Packet Approaches
    Acknowledgments
    Authors' Addresses
 
@@ -814,9 +814,9 @@ Table of Contents
               <https://datatracker.ietf.org/doc/html/draft-ietf-scone-
               protocol-05>.
 
-Design Considerations
+Appendix A.  Design Considerations
 
-Marker Interval Selection
+A.1.  Marker Interval Selection
 
    The fixed interval of 64 packets is a trade-off.  Shorter intervals
    provide more frequent measurements at the cost of higher overhead.
@@ -827,7 +827,7 @@ Marker Interval Selection
    set of predefined intervals, with observers inferring the interval
    from packet counting and the alternating counter bit.
 
-Comparison with Per-Packet Approaches
+A.2.  Comparison with Per-Packet Approaches
 
    Per-packet signals such as those in [EFMP] provide finer-grained
    measurements from every packet.  POEM trades granularity for lower
