@@ -60,16 +60,16 @@ results back to endpoints.
 
 # Introduction
 
-Packet loss is a critical metric for network operations. Detecting,
-measuring, and localizing loss is essential for maintaining quality of
-service and resolving performance issues.
+Packet loss is an important metric for network operations. Detecting,
+measuring, and localizing loss helps maintain quality of service and
+resolve performance issues.
 
 QUIC {{QUIC}} encrypts its transport headers, making passive
 observation of loss through protocol fields impossible. Unlike TCP,
 where sequence numbers and acknowledgments are visible to on-path
 observers, QUIC provides no equivalent signal. As QUIC's share of
-Internet traffic grows, this becomes an increasingly significant
-operational gap. Explicit measurement techniques
+Internet traffic grows, this limits the ability of network operators
+to measure loss. Explicit measurement techniques
 {{EXPLICIT-MEASUREMENTS}} have been proposed to address this, where
 endpoints cooperate by exposing measurement signals in the clear
 portion of packets.
@@ -87,18 +87,15 @@ packets between markers to estimate upstream loss, while the marker
 carries a sender-reported loss count enabling end-to-end and downstream
 loss estimation.
 
-POEM also defines a report mechanism that may provide utility to
-endpoints. Network elements can write measurement results into
-dedicated report packets, giving endpoints visibility into where on
-the path loss is occurring.
+POEM also defines a report mechanism where network elements write
+measurement results into dedicated report packets, allowing endpoints
+to observe where on the path loss is occurring.
 
 Like the SCONE protocol {{SCONE}}, POEM uses QUIC long header packets
 coalesced with ordinary QUIC packets and relies on on-path network
-elements that can read and modify packet fields. The two protocols are
-complementary: SCONE communicates throughput advice while POEM provides
-loss measurement. Because POEM only requires a packet in a small
-fraction of datagrams, the remaining datagrams are available for
-other coalesced signals such as SCONE.
+elements that can read and modify packet fields. Because POEM only
+requires a packet in a small fraction of datagrams, the remaining
+datagrams are available for other coalesced signals such as SCONE.
 
 
 # Conventions and Definitions
@@ -192,17 +189,16 @@ endpoint knows only that some network element between the sender and
 itself provided a loss split — not where on the path that element is
 positioned.
 
-The usefulness of the upstream ratio depends on the observer's
+The interpretation of the upstream ratio depends on the observer's
 location. A ratio written by an element at the access network edge
-(e.g., a cellular UPF or broadband gateway) provides a clear
-distinction between access and non-access loss. A ratio written by
-an element deep in the network core is less actionable for the
-endpoint.
+(e.g., a cellular UPF or broadband gateway) distinguishes access
+from non-access loss. A ratio written by an element in the network
+core provides a different, possibly less useful, split.
 
-In practice, the most common deployment is expected to involve a
-single observer in the access network. The protocol makes no
-guarantees about observer placement, however, and endpoints MUST NOT
-assume a particular observer location.
+A typical deployment involves a single observer in the access
+network. The protocol makes no guarantees about observer placement,
+however, and endpoints MUST NOT assume a particular observer
+location.
 
 ## Unidirectional Signal
 
@@ -307,7 +303,7 @@ the counter.
 
 Spurious detections that drive the counter negative are compensated
 by absorbing subsequent real losses until the counter returns to
-positive, self-correcting across intervals.
+positive.
 
 Observers MUST treat a loss count of 31 as "at least 31 losses."
 
@@ -441,8 +437,8 @@ to the previous one.
 A sender SHOULD send a marker in one of the first datagrams on the
 new path.
 
-Observers track state per 4-tuple and therefore naturally start fresh
-on the new path.
+Observers track state per 4-tuple and therefore start fresh on the
+new path.
 
 
 # Observer Behavior {#observer-behavior}
@@ -659,11 +655,9 @@ Inflated marker frequency:
 
 Inflated loss count:
 : Reporting a higher loss count than actually observed causes the
-  observer to conclude that significant downstream loss exists. This
-  is potentially more damaging from an operator perspective, since
-  downstream loss typically falls within the operator's domain and
-  may trigger investigation or remediation of faults that do not
-  exist.
+  observer to conclude that downstream loss exists. Since downstream
+  loss typically falls within the operator's domain, this may trigger
+  investigation or remediation of non-existent faults.
 
 In both cases, the observer has no reliable way to verify the
 endpoint's claims. Network operators MUST NOT use POEM signals as
