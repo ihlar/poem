@@ -762,10 +762,8 @@ Notes:
 --- back
 
 # Design Considerations
-{:numbered="false"}
 
 ## Marker Interval Selection
-{:numbered="false"}
 
 The fixed interval of 64 packets is a trade-off. Shorter intervals
 provide more frequent measurements at the cost of higher overhead.
@@ -777,7 +775,6 @@ a set of predefined intervals, with observers inferring the interval
 from packet counting and the alternating counter bit.
 
 ## Comparison with Per-Packet Approaches
-{:numbered="false"}
 
 Per-packet signals such as those in {{EFMP}} provide finer-grained
 measurements from every packet. POEM trades granularity for lower
