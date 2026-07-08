@@ -740,14 +740,14 @@ Table of Contents
    Status:  permanent
    Specification:  This document
    Change Controller:  IETF (iesg@ietf.org)
-   Contact:  SCONE Working Group (scone@ietf.org)
+   Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  POEM Marker Packet
 
    Value:  0xTBD2
    Status:  permanent
    Specification:  This document
    Change Controller:  IETF (iesg@ietf.org)
-   Contact:  SCONE Working Group (scone@ietf.org)
+   Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  POEM Report Packet
 
 14.2.  poem_supported Transport Parameter
@@ -760,7 +760,7 @@ Table of Contents
    Status:  Permanent
    Specification:  This document
    Change Controller:  IETF (iesg@ietf.org)
-   Contact:  SCONE Working Group (scone@ietf.org)
+   Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  (none)
 
 15.  References
