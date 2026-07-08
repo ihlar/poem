@@ -1,7 +1,7 @@
 ---
 title: "A Protocol for Periodic On-path Explicit Measurement"
 abbrev: "POEM"
-docname: draft-ihlar-scone-poem
+docname: draft-ihlar-scone-poem-latest
 category: info
 
 ipr: trust200902
@@ -19,6 +19,11 @@ author:
     name: Marcus Ihlar
     organization: Ericsson
     email: marcus.ihlar@ericsson.com
+
+    ins: M. Kühlewind
+    name: Mirja Kühlewind
+    organization: Ericsson
+    email: mirja.kühlewind@ericsson.com
 
 normative:
 
