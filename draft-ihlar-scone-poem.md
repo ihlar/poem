@@ -289,8 +289,11 @@ intervals yield useful loss counts at typical loss rates.
 
 ## Sender Loss Count Semantics
 
-The sender maintains an Unreported Loss counter that persists across
-marker intervals. The counter is incremented each time QUIC's loss
+The sender maintains an Unreported Loss counter, as defined in
+{{EXPLICIT-MEASUREMENTS}}, that persists across marker intervals.
+Unlike {{EXPLICIT-MEASUREMENTS}}, where the counter state is
+signaled as a single bit per packet, POEM reports the counter value
+directly in the marker's loss count field. The counter is incremented each time QUIC's loss
 detection declares a packet lost. If the implementation later
 determines that a previously declared loss was spurious (e.g., a
 late acknowledgment confirms delivery), the counter is decremented,
@@ -509,22 +512,25 @@ over multiple marker intervals. Aggregating over several intervals
 smooths out the timing difference and yields a ratio that converges
 to the true loss split.
 
-An observer MUST NOT overwrite an upstream ratio value other than 63.
-This ensures that the first observer on the path (typically the one
-closest to the sender) provides its perspective. If no observer
-writes into the report, the receiver sees 63 and knows no observer
-participated.
+Any observer on the path MAY write the upstream ratio field,
+regardless of its current value. If no observer writes into the
+report, the receiver sees 63 and knows no observer participated.
 
 ## Multiple Observers
 
-If multiple observers exist on the path, only the first observer
-(closest to the sender) will find the upstream ratio field set to 63
-and write its value. Subsequent observers see a value other than 63
-and leave it unchanged. This "first writer wins" approach provides the
-receiver with the loss split at the earliest observation point.
+If multiple observers exist on the path, each may overwrite the
+previous value. The receiver therefore sees the perspective of the
+last observer on the path (closest to the receiver).
 
-This is a simplification. Future extensions could define mechanisms
-for multiple observers to report independently.
+This is a trade-off for simplicity. For downlink traffic, the last
+writer is typically the access network element closest to the
+receiving endpoint, which is often the most relevant viewpoint. For
+uplink traffic, the last writer is further from the user, which may
+be less useful. A single-observer deployment, which is the common
+case, is unaffected by this choice.
+
+Future extensions could define mechanisms for multiple observers to
+report independently.
 
 
 # Receiver Behavior {#receiver-behavior}
