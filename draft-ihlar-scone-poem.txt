@@ -5,7 +5,7 @@
 SCONE                                                           M. Ihlar
 Internet-Draft                                              M. Kühlewind
 Intended status: Informational                                  Ericsson
-Expires: 9 January 2027                                      8 July 2026
+Expires: 15 January 2027                                    14 July 2026
 
 
           A Protocol for Periodic On-path Explicit Measurement
@@ -50,7 +50,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 9 January 2027.
+   This Internet-Draft will expire on 15 January 2027.
 
 Copyright Notice
 
@@ -338,12 +338,15 @@ Table of Contents
 
 5.2.  Sender Loss Count Semantics
 
-   The sender maintains an Unreported Loss counter that persists across
-   marker intervals.  The counter is incremented each time QUIC's loss
-   detection declares a packet lost.  If the implementation later
-   determines that a previously declared loss was spurious (e.g., a late
-   acknowledgment confirms delivery), the counter is decremented, which
-   may cause it to become negative.
+   The sender maintains an Unreported Loss counter, as defined in
+   [EXPLICIT-MEASUREMENTS], that persists across marker intervals.
+   Unlike [EXPLICIT-MEASUREMENTS], where the counter state is signaled
+   as a single bit per packet, POEM reports the counter value directly
+   in the marker's loss count field.  The counter is incremented each
+   time QUIC's loss detection declares a packet lost.  If the
+   implementation later determines that a previously declared loss was
+   spurious (e.g., a late acknowledgment confirms delivery), the counter
+   is decremented, which may cause it to become negative.
 
    When constructing a marker packet, the sender sets the loss count
    field to min(Unreported_Loss_counter, 31) if the counter is positive,
@@ -550,22 +553,25 @@ Table of Contents
    smooths out the timing difference and yields a ratio that converges
    to the true loss split.
 
-   An observer MUST NOT overwrite an upstream ratio value other than 63.
-   This ensures that the first observer on the path (typically the one
-   closest to the sender) provides its perspective.  If no observer
-   writes into the report, the receiver sees 63 and knows no observer
-   participated.
+   Any observer on the path MAY write the upstream ratio field,
+   regardless of its current value.  If no observer writes into the
+   report, the receiver sees 63 and knows no observer participated.
 
 8.4.  Multiple Observers
 
-   If multiple observers exist on the path, only the first observer
-   (closest to the sender) will find the upstream ratio field set to 63
-   and write its value.  Subsequent observers see a value other than 63
-   and leave it unchanged.  This "first writer wins" approach provides
-   the receiver with the loss split at the earliest observation point.
+   If multiple observers exist on the path, each may overwrite the
+   previous value.  The receiver therefore sees the perspective of the
+   last observer on the path (closest to the receiver).
 
-   This is a simplification.  Future extensions could define mechanisms
-   for multiple observers to report independently.
+   This is a trade-off for simplicity.  For downlink traffic, the last
+   writer is typically the access network element closest to the
+   receiving endpoint, which is often the most relevant viewpoint.  For
+   uplink traffic, the last writer is further from the user, which may
+   be less useful.  A single-observer deployment, which is the common
+   case, is unaffected by this choice.
+
+   Future extensions could define mechanisms for multiple observers to
+   report independently.
 
 9.  Receiver Behavior
 
