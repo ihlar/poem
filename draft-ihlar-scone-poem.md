@@ -576,10 +576,10 @@ the same datagram is successfully processed.
 
 ## Application Use
 
-Applications can use the loss localization information to:
+Applications can use the loss localization information, for example,
+to:
 
 - Distinguish between access network issues and core/peering issues.
-- Adapt streaming quality based on path segment health.
 - Inform path migration decisions when an endpoint has multiple
   available network accesses (e.g., Wi-Fi and cellular), by
   comparing loss characteristics across paths.
