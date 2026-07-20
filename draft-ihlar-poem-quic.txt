@@ -92,22 +92,21 @@ Table of Contents
      6.2.  Unidirectional Signal
      6.3.  Per-Flow Scope
    7.  Negotiating POEM
-   8.  Relationship to Congestion Control
-   9.  Security Considerations
-     9.1.  On-Path Modification
-     9.2.  Fake POEM Packets
-     9.3.  Misleading Reports
-     9.4.  Interaction with Loss Detection
-     9.5.  Falsified Loss Signals
-   10. Privacy Considerations
-     10.1.  Flow Identification
-     10.2.  Measurement Exposure
-   11. IANA Considerations
-     11.1.  POEM Version Numbers
-     11.2.  poem_supported Transport Parameter
-   12. References
-     12.1.  Normative References
-     12.2.  Informative References
+   8.  Security Considerations
+     8.1.  On-Path Modification
+     8.2.  Fake POEM Packets
+     8.3.  Misleading Reports
+     8.4.  Interaction with Loss Detection
+     8.5.  Falsified Loss Signals
+   9.  Privacy Considerations
+     9.1.  Flow Identification
+     9.2.  Measurement Exposure
+   10. IANA Considerations
+     10.1.  POEM Version Numbers
+     10.2.  poem_supported Transport Parameter
+   11. References
+     11.1.  Normative References
+     11.2.  Informative References
    Appendix A.  Design Considerations
      A.1.  Marker Interval Selection
      A.2.  Comparison with Per-Packet Approaches
@@ -651,40 +650,30 @@ Table of Contents
    That is, POEM packets cannot be sent on a connection until the
    transport parameter is received.
 
-8.  Relationship to Congestion Control
+8.  Security Considerations
 
-   POEM is a diagnostic protocol.  The information it provides is
-   strictly informational and MUST NOT be used to directly control
-   sending rates or congestion responses.
-
-   Applications may use POEM measurements to inform higher-level
-   decisions (e.g., adaptive bitrate selection), but these are
-   application-specific and independent of the congestion controller.
-
-9.  Security Considerations
-
-9.1.  On-Path Modification
+8.1.  On-Path Modification
 
    POEM relies on on-path network elements modifying report packets.
    The ability to modify packets demonstrates that the element is
    positioned to observe and potentially drop traffic, the same trust
    model as SCONE [SCONE].
 
-9.2.  Fake POEM Packets
+8.2.  Fake POEM Packets
 
    An attacker that can inject packets could construct fake POEM
    packets.  Endpoints mitigate this by only accepting POEM information
    from datagrams containing a successfully processed QUIC packet.  Off-
    path attackers cannot construct valid QUIC packets.
 
-9.3.  Misleading Reports
+8.3.  Misleading Reports
 
    An on-path observer could write misleading upstream ratio values.
    However, such an observer already has the ability to drop or delay
    packets.  Endpoints SHOULD treat POEM reports as advisory and cross-
    reference with their own measurements.
 
-9.4.  Interaction with Loss Detection
+8.4.  Interaction with Loss Detection
 
    The loss count reveals information about the sender's loss detection
    state.  This is similar to information derivable from timing analysis
@@ -692,7 +681,7 @@ Table of Contents
    significant new exposure beyond what is available to on-path
    observers.
 
-9.5.  Falsified Loss Signals
+8.5.  Falsified Loss Signals
 
    An endpoint can falsify POEM signals in two ways:
 
@@ -719,14 +708,14 @@ Table of Contents
    decisions.  POEM measurements from untrusted endpoints should be
    cross-referenced with other data sources before acting on them.
 
-10.  Privacy Considerations
+9.  Privacy Considerations
 
-10.1.  Flow Identification
+9.1.  Flow Identification
 
    POEM packets do not introduce new flow identifiers beyond what is
    already visible in the UDP 4-tuple and QUIC connection IDs.
 
-10.2.  Measurement Exposure
+9.2.  Measurement Exposure
 
    The loss count in marker packets reveals the sender's view of end-to-
    end loss.  This information is visible to all on-path elements
@@ -734,11 +723,11 @@ Table of Contents
    packets (once written by an observer) reveals loss localization to
    downstream observers and the receiver.
 
-11.  IANA Considerations
+10.  IANA Considerations
 
    This document requests the following registrations.
 
-11.1.  POEM Version Numbers
+10.1.  POEM Version Numbers
 
    This document registers the following entries in the "QUIC Versions"
    registry:
@@ -757,7 +746,7 @@ Table of Contents
    Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  POEM Report Packet
 
-11.2.  poem_supported Transport Parameter
+10.2.  poem_supported Transport Parameter
 
    This document registers the following entry in the "QUIC Transport
    Parameters" registry:
@@ -770,9 +759,9 @@ Table of Contents
    Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  (none)
 
-12.  References
+11.  References
 
-12.1.  Normative References
+11.1.  Normative References
 
    [INVARIANTS]
               Thomson, M., "Version-Independent Properties of QUIC",
@@ -797,7 +786,7 @@ Table of Contents
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
 
-12.2.  Informative References
+11.2.  Informative References
 
    [AltMark]  Fioccola, G., Ed., Cociglio, M., Mirsky, G., Mizrahi, T.,
               and T. Zhou, "Alternate-Marking Method", RFC 9341,
