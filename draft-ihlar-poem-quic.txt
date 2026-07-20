@@ -9,7 +9,7 @@ Expires: 21 January 2027                                    20 July 2026
 
 
           A Protocol for Periodic On-path Explicit Measurement
-                     draft-ihlar-scone-poem-latest
+                      draft-ihlar-poem-quic-latest
 
 Abstract
 
@@ -28,7 +28,7 @@ About This Document
    This note is to be removed before publishing as an RFC.
 
    Status information for this document may be found at
-   https://datatracker.ietf.org/doc/draft-ihlar-scone-poem/.
+   https://datatracker.ietf.org/doc/draft-ihlar-poem-quic/.
 
    Discussion of this document takes place on the SCONE Working Group
    mailing list (mailto:scone@ietf.org), which is archived at
@@ -71,44 +71,43 @@ Table of Contents
    1.  Introduction
    2.  Conventions and Definitions
    3.  Protocol Overview
-   4.  Applicability
-     4.1.  Observer Location
-     4.2.  Unidirectional Signal
-     4.3.  Per-Flow Scope
-   5.  Marker Packet
-     5.1.  Marker Interval
-     5.2.  Sender Loss Count Semantics
-   6.  Report Packet
-     6.1.  Upstream Ratio Semantics
-     6.2.  Report Frequency
-   7.  Sender Behavior
-     7.1.  Connection Migration
-   8.  Observer Behavior
-     8.1.  Detecting POEM Packets
-     8.2.  Processing Marker Packets
-     8.3.  Processing Report Packets
-     8.4.  Multiple Observers
-   9.  Receiver Behavior
-     9.1.  Processing Marker Packets
-     9.2.  Processing Report Packets
-     9.3.  Application Use
-   10. Negotiating POEM
-   11. Relationship to Congestion Control
-   12. Security Considerations
-     12.1.  On-Path Modification
-     12.2.  Fake POEM Packets
-     12.3.  Misleading Reports
-     12.4.  Interaction with Loss Detection
-     12.5.  Falsified Loss Signals
-   13. Privacy Considerations
-     13.1.  Flow Identification
-     13.2.  Measurement Exposure
-   14. IANA Considerations
-     14.1.  POEM Version Numbers
-     14.2.  poem_supported Transport Parameter
-   15. References
-     15.1.  Normative References
-     15.2.  Informative References
+   4.  Marker Packets
+     4.1.  Marker Packet Format
+     4.2.  Marker Interval
+     4.3.  Sender Loss Count Semantics
+     4.4.  Sending Marker Packets
+     4.5.  Observing Marker Packets
+     4.6.  Receiving Marker Packets
+     4.7.  Connection Migration
+   5.  Report Packets
+     5.1.  Report Packet Format
+     5.2.  Upstream Ratio Semantics
+     5.3.  Sending Report Packets
+     5.4.  Observing Report Packets
+       5.4.1.  Multiple Observers
+     5.5.  Receiving Report Packets
+     5.6.  Application Use
+   6.  Applicability
+     6.1.  Observer Location
+     6.2.  Unidirectional Signal
+     6.3.  Per-Flow Scope
+   7.  Negotiating POEM
+   8.  Relationship to Congestion Control
+   9.  Security Considerations
+     9.1.  On-Path Modification
+     9.2.  Fake POEM Packets
+     9.3.  Misleading Reports
+     9.4.  Interaction with Loss Detection
+     9.5.  Falsified Loss Signals
+   10. Privacy Considerations
+     10.1.  Flow Identification
+     10.2.  Measurement Exposure
+   11. IANA Considerations
+     11.1.  POEM Version Numbers
+     11.2.  poem_supported Transport Parameter
+   12. References
+     12.1.  Normative References
+     12.2.  Informative References
    Appendix A.  Design Considerations
      A.1.  Marker Interval Selection
      A.2.  Comparison with Per-Packet Approaches
@@ -182,7 +181,7 @@ Table of Contents
 3.  Protocol Overview
 
    POEM operates alongside QUIC connections.  Endpoints negotiate POEM
-   support using a QUIC transport parameter (Section 10).  Once
+   support using a QUIC transport parameter (Section 7).  Once
    negotiated, endpoints periodically send marker packets coalesced with
    ordinary QUIC packets.
 
@@ -196,7 +195,9 @@ Table of Contents
    On-path observers detect marker packets by their version field and
    count packets transiting the flow (identified by the UDP 4-tuple)
    between consecutive markers.  A count less than 64 indicates upstream
-   loss.
+   loss.  The observer can estimate downstream loss by subtracting its
+   upstream loss count from the sender's reported loss count, which
+   represents total end-to-end loss.
 
    Endpoints can also send report packets at a lower cadence.  An
    observer writes a 6-bit value into the report packet indicating the
@@ -232,45 +233,11 @@ Table of Contents
    and report packets travel from sender to receiver, and any
    measurement written by the observer is read by the receiver.  If the
    receiver needs to communicate measurement information to the sender,
-   it does so via application-layer mechanisms outside the scope of this
-   document.
+   it does so via mechanisms outside the scope of this document.
 
-4.  Applicability
+4.  Marker Packets
 
-4.1.  Observer Location
-
-   The POEM protocol does not carry any identifier or topology
-   information about the observer that writes a report.  The receiving
-   endpoint knows only that some network element between the sender and
-   itself provided a loss split — not where on the path that element is
-   positioned.
-
-   The interpretation of the upstream ratio depends on the observer's
-   location.  A ratio written by an element at the access network edge
-   (e.g., a cellular UPF or broadband gateway) distinguishes access from
-   non-access loss.  A ratio written by an element in the network core
-   provides a different, possibly less useful, split.
-
-   A typical deployment involves a single observer in the access
-   network.  The protocol makes no guarantees about observer placement,
-   however, and endpoints MUST NOT assume a particular observer
-   location.
-
-4.2.  Unidirectional Signal
-
-   POEM signals travel in the same direction as data.  The receiver
-   obtains loss localization information but the sender does not, unless
-   the receiver communicates it back through application-layer means.
-   This is analogous to the model used by other on-path signaling
-   protocols such as SCONE [SCONE].
-
-4.3.  Per-Flow Scope
-
-   POEM measurement applies to a single flow identified by the UDP
-   4-tuple.  Separate flows receive independent measurements, even if
-   they share the same endpoints or network path.
-
-5.  Marker Packet
+4.1.  Marker Packet Format
 
    A marker packet is a QUIC long header packet that follows the QUIC
    invariants; see Section 5.1 of [INVARIANTS].
@@ -326,27 +293,33 @@ Table of Contents
    the first packet in the UDP datagram.  A sender MUST NOT include more
    than one marker packet in a datagram.
 
-5.1.  Marker Interval
+4.2.  Marker Interval
 
    The marker interval is fixed at 64 packets.  After sending a marker,
    the sender counts 63 additional packets (including the QUIC packet
    coalesced with the marker) and then sends the next marker.
 
+   For the purpose of POEM, a packet is a single UDP datagram.
+   Observers count UDP datagrams on the 4-tuple regardless of how many
+   QUIC packets are coalesced within each datagram.
+
    The value 64 balances measurement granularity against overhead:
    markers constitute less than 2% of total packets while individual
    intervals yield useful loss counts at typical loss rates.
 
-5.2.  Sender Loss Count Semantics
+4.3.  Sender Loss Count Semantics
 
    The sender maintains an Unreported Loss counter, as defined in
    [EXPLICIT-MEASUREMENTS], that persists across marker intervals.
    Unlike [EXPLICIT-MEASUREMENTS], where the counter state is signaled
    as a single bit per packet, POEM reports the counter value directly
-   in the marker's loss count field.  The counter is incremented each
-   time QUIC's loss detection declares a packet lost.  If the
-   implementation later determines that a previously declared loss was
-   spurious (e.g., a late acknowledgment confirms delivery), the counter
-   is decremented, which may cause it to become negative.
+   in the marker's loss count field.
+
+   The counter is incremented each time QUIC's loss detection declares a
+   packet lost.  If the implementation later determines that a
+   previously declared loss was spurious (e.g., a late acknowledgment
+   confirms delivery), the counter is decremented, which may cause it to
+   become negative.
 
    When constructing a marker packet, the sender sets the loss count
    field to min(Unreported_Loss_counter, 31) if the counter is positive,
@@ -359,7 +332,104 @@ Table of Contents
 
    Observers MUST treat a loss count of 31 as "at least 31 losses."
 
-6.  Report Packet
+4.4.  Sending Marker Packets
+
+   POEM packets can only be sent once both endpoints have exchanged the
+   poem_supported transport parameter (Section 7).  This means the first
+   POEM packet cannot be coalesced with the Initial packets of a QUIC
+   handshake.
+
+   A sender that has negotiated POEM support proceeds as follows:
+
+   1.  Maintain a packet counter, initialized to 0 after each marker.
+
+   2.  Maintain an Unreported Loss counter (persistent across markers),
+       initialized to 0 at connection start.  Increment on each loss
+       declaration; decrement on each spurious loss detection.  The
+       counter may become negative.
+
+   3.  After sending 63 packets following the previous marker, construct
+       the next marker packet:
+
+       *  Toggle the counter bit.
+
+       *  Set the loss count field to min(Unreported_Loss_counter, 31)
+          if positive, or 0 otherwise.
+
+       *  Subtract the reported value from the Unreported Loss counter.
+
+       *  Reset the packet counter.
+
+   4.  Coalesce the marker packet as the first packet in the next UDP
+       datagram, followed by one or more QUIC packets.
+
+   A sender SHOULD include a marker packet in one of the first few
+   datagrams sent after negotiation completes to allow observers to
+   begin measurement early.
+
+4.5.  Observing Marker Packets
+
+   An observer identifies marker packets by the long header bit (0x80)
+   in the first byte and the version field 0xTBD1.
+
+   An observer begins counting packets for a flow upon observing the
+   first marker on that 4-tuple.  No measurement is possible until the
+   second marker is observed, at which point the first interval count is
+   available.  This applies both to flows observed from the start and to
+   flows detected mid-way.
+
+   When an observer detects a marker packet, it:
+
+   1.  Records the current packet count for the flow (identified by the
+       UDP 4-tuple) since and including the previous marker.
+
+   2.  Reads the counter bit to detect marker loss.  If the counter bit
+       is the same as the previous marker's counter bit, one marker was
+       lost (and the observer should treat the interval as spanning two
+       marker periods).
+
+   3.  Reads the loss count field, which indicates the sender's observed
+       end-to-end loss for the preceding interval.
+
+   4.  Computes upstream loss for the interval as: upstream_loss = N -
+       observed_packet_count, where N is 64 (or 128 if a lost marker was
+       detected).
+
+   5.  Forwards the marker packet unmodified.
+
+   The observer does not modify marker packets.
+
+4.6.  Receiving Marker Packets
+
+   The receiver reads the marker packet to obtain:
+
+   *  The counter bit, to detect marker loss.
+
+   *  The loss count, indicating the sender's reported losses.
+
+   The receiver MAY use this information for its own diagnostics or
+   relay it to the application layer.
+
+   A marker packet MUST be discarded (its contents ignored) unless
+   another QUIC packet in the same datagram is successfully processed.
+
+4.7.  Connection Migration
+
+   When a QUIC connection migrates to a new path (new UDP 4-tuple), the
+   sender MUST reset its packet counter and MUST reset the Unreported
+   Loss counter.  Carrying loss state across paths would both produce
+   meaningless measurements and risk linking the new path to the
+   previous one.
+
+   A sender SHOULD send a marker in one of the first datagrams on the
+   new path.
+
+   Observers track state per 4-tuple and therefore start fresh on the
+   new path.
+
+5.  Report Packets
+
+5.1.  Report Packet Format
 
    A report packet is a QUIC long header packet that an on-path network
    element can update with measurement information for the receiving
@@ -400,12 +470,12 @@ Table of Contents
       POEM report packet.
 
    Destination Connection ID and Source Connection ID:  Same rules as
-      for marker packets (Section 5).
+      for marker packets (Section 4).
 
    Report packets MUST be coalesced with other QUIC packets and MUST be
    the first packet in the UDP datagram.
 
-6.1.  Upstream Ratio Semantics
+5.2.  Upstream Ratio Semantics
 
    The upstream ratio encodes the observer's estimate of what fraction
    of total path loss occurs upstream of its position.  The value 63
@@ -420,113 +490,23 @@ Table of Contents
    (approximately 1/3), it can infer roughly 1% upstream loss and 2%
    downstream loss relative to the observer.
 
-   The observer computes this ratio from its own packet counting
-   (upstream loss) and the sender's reported loss count (end-to-end
-   loss).  The computation is described in Section 8.
-
-6.2.  Report Frequency
+5.3.  Sending Report Packets
 
    Report packets SHOULD be sent less frequently than marker packets.  A
    rate of one report every 4 to 8 marker intervals (every 256 to 512
    packets) is RECOMMENDED.  The precise cadence is a sender decision.
 
-7.  Sender Behavior
-
-   A sender that has negotiated POEM support (Section 10) proceeds as
-   follows:
-
-   1.  Maintain a packet counter, initialized to 0 after each marker.
-
-   2.  Maintain an Unreported Loss counter (persistent across markers),
-       initialized to 0 at connection start.  Increment on each loss
-       declaration; decrement on each spurious loss detection.  The
-       counter may become negative.
-
-   3.  After sending 63 packets following the previous marker, construct
-       the next marker packet:
-
-       *  Toggle the counter bit.
-
-       *  Set the loss count field to min(Unreported_Loss_counter, 31)
-          if positive, or 0 otherwise.
-
-       *  Subtract the reported value from the Unreported Loss counter.
-
-       *  Reset the packet counter.
-
-   4.  Coalesce the marker packet as the first packet in the next UDP
-       datagram, followed by one or more QUIC packets.
-
-   5.  Periodically (at the chosen report cadence), send a report packet
-       instead of or in addition to a marker packet, with the upstream
-       ratio field set to 63.
-
-   POEM packets can only be sent once both endpoints have exchanged the
-   poem_supported transport parameter.  This means the first POEM packet
-   cannot be coalesced with the Initial packets of a QUIC handshake.
-
-   A sender SHOULD include a marker packet in one of the first few
-   datagrams sent after negotiation completes to allow observers to
-   begin measurement early.
+   When sending a report packet, the sender sets the upstream ratio
+   field to 63 and coalesces the report as the first packet in the UDP
+   datagram.
 
    A sender MUST NOT send both a marker packet and a report packet in
    the same datagram.
 
-7.1.  Connection Migration
+5.4.  Observing Report Packets
 
-   When a QUIC connection migrates to a new path (new UDP 4-tuple), the
-   sender MUST reset its packet counter and MUST reset the Unreported
-   Loss counter.  Carrying loss state across paths would both produce
-   meaningless measurements and risk linking the new path to the
-   previous one.
-
-   A sender SHOULD send a marker in one of the first datagrams on the
-   new path.
-
-   Observers track state per 4-tuple and therefore start fresh on the
-   new path.
-
-8.  Observer Behavior
-
-   An observer is an on-path network element that reads and optionally
-   modifies POEM packets.
-
-8.1.  Detecting POEM Packets
-
-   An observer identifies POEM packets by the long header bit (0x80) in
-   the first byte and the version field (0xTBD1 for markers, 0xTBD2 for
-   reports).
-
-8.2.  Processing Marker Packets
-
-   An observer begins counting packets for a flow upon observing the
-   first marker on that 4-tuple.  No measurement is possible until the
-   second marker is observed, at which point the first interval count is
-   available.  This applies both to flows observed from the start and to
-   flows detected mid-way.
-
-   When an observer detects a marker packet, it:
-
-   1.  Records the current packet count for the flow (identified by the
-       UDP 4-tuple) since the last observed marker.
-
-   2.  Reads the counter bit to detect marker loss.  If the counter bit
-       is the same as the previous marker's counter bit, one marker was
-       lost (and the observer should treat the interval as spanning two
-       marker periods).
-
-   3.  Reads the loss count field, which indicates the sender's observed
-       end-to-end loss for the preceding interval.
-
-   4.  Computes upstream loss for the interval as: upstream_loss = N -
-       observed_packet_count, where N is 64 (or 128 if a lost marker was
-       detected).
-
-   5.  Forwards the marker packet unmodified.
-
-   The observer does not modify marker packets.
-
-8.3.  Processing Report Packets
+   An observer identifies report packets by the long header bit (0x80)
+   in the first byte and the version field 0xTBD2.
 
    When an observer detects a report packet, it MAY write measurement
    information into the upstream ratio field:
@@ -539,8 +519,7 @@ Table of Contents
    3.  If total loss is non-zero, compute: upstream_ratio =
        (upstream_loss / total_loss) * 62, clamped to the range 0-62.
 
-   4.  If the current value in the upstream ratio field is 63 (not yet
-       written by another observer), write the computed value.
+   4.  Write the computed value into the upstream ratio field.
 
    The upstream loss (from packet counting) and the sender's reported
    loss count are not perfectly synchronized.  The observer's count
@@ -557,7 +536,7 @@ Table of Contents
    regardless of its current value.  If no observer writes into the
    report, the receiver sees 63 and knows no observer participated.
 
-8.4.  Multiple Observers
+5.4.1.  Multiple Observers
 
    If multiple observers exist on the path, each may overwrite the
    previous value.  The receiver therefore sees the perspective of the
@@ -573,49 +552,35 @@ Table of Contents
    Future extensions could define mechanisms for multiple observers to
    report independently.
 
-9.  Receiver Behavior
-
-   A receiver that has negotiated POEM support processes incoming
-   datagrams as follows:
-
-9.1.  Processing Marker Packets
-
-   The receiver reads the marker packet to obtain:
-
-   *  The counter bit, to detect marker loss.
-
-   *  The loss count, indicating the sender's reported losses.
-
-   The receiver MAY use this information for its own diagnostics or
-   relay it to the application layer.
-
-   A marker packet MUST be discarded (its contents ignored) unless
-   another QUIC packet in the same datagram is successfully processed.
-
-9.2.  Processing Report Packets
+5.5.  Receiving Report Packets
 
    The receiver reads the upstream ratio field.  A value of 63 indicates
    that no observer on the path wrote a measurement.  Values 0 through
    62 indicate an observer's estimate of the upstream loss fraction.
 
-   Combined with its own end-to-end loss measurement (from QUIC
-   acknowledgment processing), the receiver can estimate:
+   Combined with its own end-to-end loss measurement, the receiver can
+   estimate:
 
    *  Upstream loss rate = end_to_end_loss * (upstream_ratio / 62)
 
    *  Downstream loss rate = end_to_end_loss * (1 - upstream_ratio / 62)
+
+   The receiver can derive end-to-end loss either from its own
+   acknowledgment processing or by counting packets between markers
+   (applying the same technique as an observer).  The latter provides an
+   independent measurement that does not depend on ACK processing.
 
    The upstream ratio is a statistical estimate that converges over
    time.  Receivers SHOULD average the ratio over multiple reports
    before drawing conclusions about loss localization.
 
    The receiver has no information about which network element wrote the
-   ratio or where on the path it is positioned; see Section 4.
+   ratio or where on the path it is positioned; see Section 6.
 
    A report packet MUST be discarded unless another QUIC packet in the
    same datagram is successfully processed.
 
-9.3.  Application Use
+5.6.  Application Use
 
    Applications can use the loss localization information, for example,
    to:
@@ -631,25 +596,62 @@ Table of Contents
    How applications use this information is out of scope for this
    document.
 
-10.  Negotiating POEM
+6.  Applicability
 
-   A QUIC endpoint indicates willingness to receive POEM packets by
+6.1.  Observer Location
+
+   The POEM protocol does not carry any identifier or topology
+   information about the observer that writes a report.  The receiving
+   endpoint knows only that some network element between the sender and
+   itself provided a loss split — not where on the path that element is
+   positioned.
+
+   The interpretation of the upstream ratio depends on the observer's
+   location.  A ratio written by an element at the access network edge
+   (e.g., a cellular UPF or broadband gateway) distinguishes access from
+   non-access loss.  A ratio written by an element in the network core
+   provides a different, possibly less useful, split.
+
+   A typical deployment involves a single observer in the access
+   network.  The protocol makes no guarantees about observer placement,
+   however, and endpoints SHOULD NOT assume a particular observer
+   location.
+
+6.2.  Unidirectional Signal
+
+   POEM signals travel in the same direction as data.  The receiver
+   obtains loss localization information but the sender does not, unless
+   the receiver communicates it back through other means.  This is
+   analogous to the model used by other on-path signaling protocols such
+   as SCONE [SCONE].
+
+6.3.  Per-Flow Scope
+
+   POEM measurement applies to a single flow identified by the UDP
+   4-tuple.  Separate flows receive independent measurements, even if
+   they share the same endpoints or network path.
+
+7.  Negotiating POEM
+
+   A QUIC endpoint indicates that it is able to receive POEM packets by
    including the poem_supported transport parameter (0xTBD) in the QUIC
    handshake.
 
-   The poem_supported transport parameter is empty.  Receiving a non-
-   zero length value MUST be treated as a connection error of type
+   Each endpoint independently indicates willingness to receive POEM
+   packets.  An endpoint that does not include the poem_supported
+   transport parameter can send POEM packets if its peer includes the
+   transport parameter.
+
+   The poem_supported transport parameter MUST be empty.  Receiving a
+   non-zero length value MUST be treated as a connection error of type
    TRANSPORT_PARAMETER_ERROR.
 
-   Each endpoint independently indicates willingness to receive POEM
-   packets.  An endpoint that does not include the transport parameter
-   can still send POEM packets if its peer has indicated support.
+   Endpoints MUST NOT remember whether the poem_supported transport
+   parameter was present on the previous connection when using 0-RTT.
+   That is, POEM packets cannot be sent on a connection until the
+   transport parameter is received.
 
-   A client MUST NOT use a remembered value of poem_supported for 0-RTT
-   connections.  POEM packets MUST NOT be sent until the transport
-   parameter is received from the peer.
-
-11.  Relationship to Congestion Control
+8.  Relationship to Congestion Control
 
    POEM is a diagnostic protocol.  The information it provides is
    strictly informational and MUST NOT be used to directly control
@@ -659,30 +661,30 @@ Table of Contents
    decisions (e.g., adaptive bitrate selection), but these are
    application-specific and independent of the congestion controller.
 
-12.  Security Considerations
+9.  Security Considerations
 
-12.1.  On-Path Modification
+9.1.  On-Path Modification
 
    POEM relies on on-path network elements modifying report packets.
    The ability to modify packets demonstrates that the element is
    positioned to observe and potentially drop traffic, the same trust
    model as SCONE [SCONE].
 
-12.2.  Fake POEM Packets
+9.2.  Fake POEM Packets
 
    An attacker that can inject packets could construct fake POEM
    packets.  Endpoints mitigate this by only accepting POEM information
    from datagrams containing a successfully processed QUIC packet.  Off-
    path attackers cannot construct valid QUIC packets.
 
-12.3.  Misleading Reports
+9.3.  Misleading Reports
 
    An on-path observer could write misleading upstream ratio values.
    However, such an observer already has the ability to drop or delay
    packets.  Endpoints SHOULD treat POEM reports as advisory and cross-
    reference with their own measurements.
 
-12.4.  Interaction with Loss Detection
+9.4.  Interaction with Loss Detection
 
    The loss count reveals information about the sender's loss detection
    state.  This is similar to information derivable from timing analysis
@@ -690,7 +692,7 @@ Table of Contents
    significant new exposure beyond what is available to on-path
    observers.
 
-12.5.  Falsified Loss Signals
+9.5.  Falsified Loss Signals
 
    An endpoint can falsify POEM signals in two ways:
 
@@ -706,20 +708,25 @@ Table of Contents
       operator's domain, this may trigger investigation or remediation
       of non-existent faults.
 
+   Deflated loss count:  Reporting a lower loss count than actually
+      observed (including always reporting 0) causes the observer to
+      attribute all observed loss to the upstream segment, concealing
+      downstream loss.
+
    In both cases, the observer has no reliable way to verify the
    endpoint's claims.  Network operators MUST NOT use POEM signals as
    the sole input to automated network policy, assurance, or engineering
    decisions.  POEM measurements from untrusted endpoints should be
    cross-referenced with other data sources before acting on them.
 
-13.  Privacy Considerations
+10.  Privacy Considerations
 
-13.1.  Flow Identification
+10.1.  Flow Identification
 
    POEM packets do not introduce new flow identifiers beyond what is
    already visible in the UDP 4-tuple and QUIC connection IDs.
 
-13.2.  Measurement Exposure
+10.2.  Measurement Exposure
 
    The loss count in marker packets reveals the sender's view of end-to-
    end loss.  This information is visible to all on-path elements
@@ -727,11 +734,11 @@ Table of Contents
    packets (once written by an observer) reveals loss localization to
    downstream observers and the receiver.
 
-14.  IANA Considerations
+11.  IANA Considerations
 
    This document requests the following registrations.
 
-14.1.  POEM Version Numbers
+11.1.  POEM Version Numbers
 
    This document registers the following entries in the "QUIC Versions"
    registry:
@@ -750,7 +757,7 @@ Table of Contents
    Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  POEM Report Packet
 
-14.2.  poem_supported Transport Parameter
+11.2.  poem_supported Transport Parameter
 
    This document registers the following entry in the "QUIC Transport
    Parameters" registry:
@@ -763,9 +770,9 @@ Table of Contents
    Contact:  QUIC Working Group (quic@ietf.org)
    Notes:  (none)
 
-15.  References
+12.  References
 
-15.1.  Normative References
+12.1.  Normative References
 
    [INVARIANTS]
               Thomson, M., "Version-Independent Properties of QUIC",
@@ -790,7 +797,7 @@ Table of Contents
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
 
-15.2.  Informative References
+12.2.  Informative References
 
    [AltMark]  Fioccola, G., Ed., Cociglio, M., Mirsky, G., Mizrahi, T.,
               and T. Zhou, "Alternate-Marking Method", RFC 9341,
