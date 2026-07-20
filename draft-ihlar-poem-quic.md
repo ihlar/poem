@@ -615,18 +615,6 @@ parameter was present on the previous connection when using 0-RTT.
 That is, POEM packets cannot be sent on a connection until the
 transport parameter is received.
 
-
-# Relationship to Congestion Control
-
-POEM is a diagnostic protocol. The information it provides is
-strictly informational and MUST NOT be used to directly control
-sending rates or congestion responses.
-
-Applications may use POEM measurements to inform higher-level
-decisions (e.g., adaptive bitrate selection), but these are
-application-specific and independent of the congestion controller.
-
-
 # Security Considerations
 
 ## On-Path Modification
