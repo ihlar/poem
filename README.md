@@ -4,10 +4,10 @@
 
 This is the working area for the individual Internet-Draft, "A Protocol for Periodic On-path Explicit Measurement".
 
-* [Editor's Copy](https://ihlar.github.io/poem/#go.draft-ihlar-scone-poem.html)
-* [Datatracker Page](https://datatracker.ietf.org/doc/draft-ihlar-scone-poem)
-* [Individual Draft](https://datatracker.ietf.org/doc/html/draft-ihlar-scone-poem)
-* [Compare Editor's Copy to Individual Draft](https://ihlar.github.io/poem/#go.draft-ihlar-scone-poem.diff)
+* [Editor's Copy](https://ihlar.github.io/poem/#go.draft-ihlar-poem-quic.html)
+* [Datatracker Page](https://datatracker.ietf.org/doc/draft-ihlar-poem-quic)
+* [Individual Draft](https://datatracker.ietf.org/doc/html/draft-ihlar-poem-quic)
+* [Compare Editor's Copy to Individual Draft](https://ihlar.github.io/poem/#go.draft-ihlar-poem-quic.diff)
 
 
 ## Contributing
@@ -28,4 +28,3 @@ $ make
 
 Command line usage requires that you have the necessary software installed.  See
 [the instructions](https://github.com/martinthomson/i-d-template/blob/main/doc/SETUP.md).
-
