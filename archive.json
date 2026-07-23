@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-07-21T01:25:22.341991+00:00",
+  "timestamp": "2026-07-23T01:43:56.029165+00:00",
   "repo": "ihlar/poem",
   "labels": [
     {
@@ -63,6 +63,38 @@
       "body": "A third POEM packet type for endpoint-to-endpoint delay measurement. One endpoint sends an echo, the peer replies. On-path observers time the echo and reply to measure RTT and split it into upstream/downstream components.\n\nPayload bits could be used to encode reply delay, possibly using some logarithmic encoding. This would make measurements more precise than the spin bit. \nReport packets can be added for delay as well. \nSending frequency could be left to endpoints or be defined by the protocol. It could range from once per RTT to occasional pings.  \n ",
       "createdAt": "2026-07-16T14:20:45Z",
       "updatedAt": "2026-07-16T14:21:09Z",
+      "closedAt": null,
+      "comments": []
+    },
+    {
+      "number": 2,
+      "id": "I_kwDOTR94Gs8AAAABJlA2vQ",
+      "title": "Guidance on reordering",
+      "url": "https://github.com/ihlar/poem/issues/2",
+      "state": "OPEN",
+      "author": "ihlar",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "Packet reordering around marker packets causes the observer to count intervals of different sizes (e.g., 63 and 65 instead of 64 and 64). This doesn't represent actual loss but inflates the upstream loss estimate in one interval and deflates it in the next.\nSimple averaging over multiple intervals is probably sufficient to handle this, but the document could provide explicit guidance for observers.",
+      "createdAt": "2026-07-21T10:15:58Z",
+      "updatedAt": "2026-07-21T10:15:58Z",
+      "closedAt": null,
+      "comments": []
+    },
+    {
+      "number": 3,
+      "id": "I_kwDOTR94Gs8AAAABJtwoxg",
+      "title": "Alternative report design",
+      "url": "https://github.com/ihlar/poem/issues/3",
+      "state": "OPEN",
+      "author": "ihlar",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "Instead of dedicated report packets, the observer could rewrite the loss count field in marker packets and flip the MSB of the version to signal modification. The rewritten value represents downstream loss (total - upstream) as computed by the observer.\nReceivers get more frequent and detailed loss information from the network, but needs to compute ratios themselves.\nIn a chain of observers, the downstream observers will lose total-loss information.",
+      "createdAt": "2026-07-22T08:14:30Z",
+      "updatedAt": "2026-07-22T08:14:30Z",
       "closedAt": null,
       "comments": []
     }
