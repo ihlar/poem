@@ -448,10 +448,9 @@ opposite direction.
 
 Otherwise, observers cannot detect duplicates or missed samples, and
 chains they do not see can bring the Sample ID back to the same
-value. Observers SHOULD discard pairs with implausible intervals, for
-example much shorter or longer than recent measurements, while still
-tracking genuine changes in delay. Observers MUST discard negative
-results.
+value. Observers therefore discard implausible results, such as
+negative values or intervals much shorter or longer than recent
+measurements.
 
 ## Observer State
 
