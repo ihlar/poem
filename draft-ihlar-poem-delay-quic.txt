@@ -1,0 +1,1004 @@
+
+
+
+
+SCONE                                                           M. Ihlar
+Internet-Draft                                              M. Kühlewind
+Intended status: Informational                                  Ericsson
+Expires: 6 May 2027                                      2 November 2026
+
+
+             Periodic On-path Explicit Measurement of Delay
+                   draft-ihlar-poem-delay-quic-latest
+
+Abstract
+
+   This document defines POEM Delay, a delay measurement companion to
+   the Periodic On-path Explicit Measurement (POEM) protocol for loss
+   measurement.  A delay sample packet, coalesced with ordinary QUIC
+   packets, bounces between the endpoints of a connection.  On-path
+   observers timestamp the sample in each direction to measure the
+   round-trip time and its components on either side of the observer.
+   Each sample carries a coarse indication of how long the sending
+   endpoint held it before reflecting it, so observers can largely
+   exclude endpoint delay from their measurements.  A report packet lets
+   observers tell endpoints how network delay is split between the two
+   sides of the observer.
+
+About This Document
+
+   This note is to be removed before publishing as an RFC.
+
+   Status information for this document may be found at
+   https://datatracker.ietf.org/doc/draft-ihlar-poem-delay-quic/.
+
+   Discussion of this document takes place on the SCONE Working Group
+   mailing list (mailto:scone@ietf.org), which is archived at
+   https://mailarchive.ietf.org/arch/browse/scone/.  Subscribe at
+   https://www.ietf.org/mailman/listinfo/scone/.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 6 May 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Overview
+   4.  Delay Sample Packets
+     4.1.  Delay Sample Packet Format
+     4.2.  Response Delay
+     4.3.  Generation
+     4.4.  Reflection
+     4.5.  Reflection Opportunities
+     4.6.  Receiving Delay Samples
+     4.7.  Connection Migration
+   5.  Observing Delay Samples
+     5.1.  Bidirectional Observers
+     5.2.  Unidirectional Observers
+     5.3.  Validity of Measurements
+     5.4.  Observer State
+   6.  Delay Report Packets
+     6.1.  Delay Report Packet Format
+     6.2.  Sending Delay Report Packets
+     6.3.  Observing Delay Report Packets
+     6.4.  Receiving Delay Report Packets
+     6.5.  Application Use
+   7.  Applicability
+     7.1.  Observer Location
+     7.2.  Measurement Rate and Accuracy
+     7.3.  Bidirectional Requirement
+     7.4.  Per-Flow Scope
+     7.5.  Relationship to the Spin Bit
+   8.  Negotiating POEM Delay
+   9.  Security Considerations
+     9.1.  On-Path Modification
+     9.2.  Fake Packets
+     9.3.  Misleading Reports
+     9.4.  Falsified Delay Signals
+     9.5.  Resource Use
+   10. Privacy Considerations
+     10.1.  Flow Identification
+     10.2.  Endpoint Roles
+     10.3.  Delay Exposure
+   11. IANA Considerations
+     11.1.  POEM Delay Version Numbers
+     11.2.  poem_delay_supported Transport Parameter
+   12. References
+     12.1.  Normative References
+     12.2.  Informative References
+   Appendix A.  Design Considerations
+     A.1.  Differences from the Delay Bit
+     A.2.  Signals in the First Octet
+     A.3.  Response Delay Encoding
+     A.4.  Maximum Response Delay
+     A.5.  Chain Lifetime
+     A.6.  Report Content
+   Acknowledgments
+   Authors' Addresses
+
+1.  Introduction
+
+   QUIC [QUIC] encrypts the transport header fields that on-path
+   observers use to measure delay for TCP.  The QUIC spin bit
+   (Section 17.4 of [QUIC]) provides an end-to-end RTT signal, but it is
+   inaccurate under reordering, loss, and application-limited traffic.
+
+   The Delay bit [EXPLICIT-MEASUREMENTS] addresses these limitations.  A
+   single marked packet, the delay sample, bounces between client and
+   server.  Observers that see one direction measure the end-to-end RTT;
+   observers that see both directions also measure the RTT between
+   themselves and each endpoint.
+
+   This document carries the delay sample in a QUIC long header packet
+   coalesced with ordinary QUIC packets, following SCONE [SCONE] and the
+   loss measurement protocol of [POEM], referred to here as POEM Loss.
+   As in those protocols, all information is carried in the first octet.
+   The available bits allow two extensions:
+
+   *  A Sample ID, which lets observers distinguish samples of different
+      chains.
+
+   *  A coarse response delay, which observers subtract to measure
+      network delay rather than network plus endpoint delay.
+
+   A delay report packet, analogous to the POEM Loss report, lets an
+   observer tell an endpoint how network delay is split between the two
+   sides of the observer.
+
+   POEM Loss and POEM Delay are independent and can be used together.
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   This document uses the following terms:
+
+   Delay sample:  A delay sample packet (Section 4).
+
+   Sample chain:  A delay sample generated by the client and all of its
+      reflections.  All samples in a chain carry the same Sample ID.
+
+   Generation:  Sending a delay sample that starts a new chain.  Only
+      the client generates delay samples.
+
+   Reflection:  Sending a delay sample in response to receiving one.
+
+   Response delay:  The time between an endpoint receiving a delay
+      sample and sending its reflection.
+
+   Observer:  An on-path network element that timestamps delay samples
+      or writes into delay report packets.
+
+   Component:  The round-trip delay between the observer and one
+      endpoint.
+
+   Network RTT:  The end-to-end round-trip time excluding the response
+      delay of both endpoints, equal to the sum of the network portion
+      of both components.
+
+3.  Overview
+
+   Endpoints negotiate support with a transport parameter (Section 8).
+   The client then generates a delay sample, coalesced with an ordinary
+   QUIC packet.  An endpoint that receives a delay sample reflects it in
+   the next datagram it sends that can carry it.  The sample crosses the
+   path once in each direction per round trip.
+
+   Each delay sample carries a 2-bit Sample ID identifying the chain and
+   a 4-bit Response Delay indicating, in coarse steps, how long the
+   sending endpoint held the sample.
+
+   An observer records when it sees each sample, as shown in Figure 1.
+
+   +--------+           +----------+           +--------+
+   | Client |           | Observer |           | Server |
+   +---+----+           +----+-----+           +----+---+
+       |                     |                      |
+       |---- DS(id,..) ----->| t0                   |
+       |                     |--------------------->|
+       |                     |                      | D1
+       |                     |<----- DS(id,D1) -----|
+       |<--------------------| t1                   |
+    D2 |                     |                      |
+       |---- DS(id,D2) ----->| t2                   |
+       |                     |--------------------->|
+       |                     |                      |
+
+     Server component (network) = t1 - t0 - D1
+     Client component (network) = t2 - t1 - D2
+     Network RTT                = t2 - t0 - D1 - D2
+
+                      Figure 1: Delay Sample Operation
+
+   An observer that sees both directions measures both components and
+   the network RTT.  An observer that sees one direction measures the
+   RTT, but can only subtract the response delay of one endpoint
+   (Section 5.2).
+
+   Endpoints can also send delay report packets (Section 6), into which
+   an observer writes the fraction of the network RTT on the side of the
+   report sender.
+
+4.  Delay Sample Packets
+
+4.1.  Delay Sample Packet Format
+
+   A delay sample packet is a QUIC long header packet that follows the
+   QUIC invariants; see Section 5.1 of [INVARIANTS].
+
+   Delay Sample Packet {
+     Header Form (1) = 1,
+     Reserved (1),
+     Sample ID (2),
+     Response Delay (4),
+     Version (32) = 0xTBD3,
+     Destination Connection ID Length (8),
+     Destination Connection ID (0..2040),
+     Source Connection ID Length (8),
+     Source Connection ID (0..2040),
+   }
+
+                    Figure 2: Delay Sample Packet Format
+
+   Header Form:  Set to 1 (0x80), indicating a QUIC long header packet.
+
+   Reserved:  The next bit (0x40) is reserved and can be set according
+      to [QUIC-BIT].
+
+   Sample ID:  A 2-bit value (0x30) identifying the chain.  The client
+      increments it, modulo 4, for each generation.  Reflections copy
+      it.
+
+   Response Delay:  A 4-bit code (0x0f) for the response delay of the
+      sending endpoint (Section 4.2).
+
+   Version:  Set to 0xTBD3, identifying a POEM Delay sample packet.
+
+   Destination Connection ID Length and Destination Connection ID:  Set
+      to the same value as other packets in the datagram; see
+      Section 12.2 of [QUIC].
+
+   Source Connection ID Length and Source Connection ID:  Set to match
+      the Source Connection ID of the packet that follows in the
+      datagram.  If that packet has a short header, the length is 0.
+
+   Delay sample packets MUST be coalesced with other QUIC packets and
+   MUST be the first packet in the UDP datagram.
+
+   SCONE packets and POEM Loss packets also need to be first in a
+   datagram, so a datagram carries at most one of these or a delay
+   sample or delay report packet.  If a reflection is due when the next
+   datagram already carries such a packet, the endpoint reflects in a
+   later datagram and includes the wait in the response delay.
+   Endpoints SHOULD NOT add an optional packet of this kind, such as a
+   delay report, to a datagram while a reflection is pending.
+
+4.2.  Response Delay
+
+   The response delay is the interval between receiving the datagram
+   carrying a delay sample and sending the datagram carrying its
+   reflection.  Typically, an endpoint records the receive time when it
+   extracts the delay sample, before or after processing the coalesced
+   QUIC packet, and computes the response delay when it builds the
+   datagram carrying the reflection.  A receive time recorded before
+   processing is discarded if the coalesced packet is not successfully
+   processed (Section 4.6).
+
+   The Response Delay field encodes the response delay in steps of 2
+   milliseconds:
+
+             +======+====================+===================+
+             | Code | Response delay     | Observer estimate |
+             +======+====================+===================+
+             | 0    | 0 ms to < 2 ms     | 1 ms              |
+             +------+--------------------+-------------------+
+             | 1    | 2 ms to < 4 ms     | 3 ms              |
+             +------+--------------------+-------------------+
+             | n    | 2n ms to < 2n+2 ms | 2n+1 ms           |
+             +------+--------------------+-------------------+
+             | 14   | 28 ms to < 30 ms   | 29 ms             |
+             +------+--------------------+-------------------+
+             | 15   | Not reported       | (none)            |
+             +------+--------------------+-------------------+
+
+                       Table 1: Response Delay Codes
+
+   The coarse encoding is deliberate.  A precise response delay would
+   expose endpoint-internal timing, such as cryptographic processing
+   time; see Section 10.3 and Appendix A.2.
+
+   An endpoint MUST NOT reflect a sample if the response delay would
+   reach MAX_RESPONSE_DELAY, which is 30 milliseconds.  The sample is
+   dropped and the chain ends.  Because the limit is fixed, the client
+   can account for it in T_Max (Section 4.3).
+
+   Generated samples carry code 15.  An endpoint MAY also send code 15
+   in a reflection, for example if it cannot measure the response delay
+   or does not want to expose it.
+
+   Endpoints do not need synchronized clocks.  Endpoints and observers
+   each measure intervals on their own clock.
+
+4.3.  Generation
+
+   Only the client generates delay samples, and only after negotiating
+   support (Section 8).  When and whether to generate is up to the
+   client; the server reflects any chain it receives.  A client that
+   wants continuous measurement typically starts a new chain:
+
+   *  in one of the first datagrams it sends after receiving the
+      server's transport parameter,
+
+   *  on a new path, once it is permitted to send on it (Section 4.7),
+
+   *  when T_Max has elapsed since it last sent a sample of the current
+      chain without receiving an acceptable reflection (Section 4.4),
+      and
+
+   *  when a chain ends because of the response delay limit
+      (Section 4.2) or the chain length limit (below).
+
+   To generate a sample, the client sets the Sample ID to that of the
+   previous chain on the path plus one, modulo 4 (any value for the
+   first chain on a path) and sets the Response Delay to 15.
+
+   T_Max needs to exceed the RTT plus the server's response delay,
+   allowing for variation, so that the client does not replace chains
+   that are still in flight.  A suitable value is twice the smoothed RTT
+   plus MAX_RESPONSE_DELAY, or 1 second until an RTT estimate is
+   available.  For example, QUIC versions 1 and 2 provide a smoothed RTT
+   estimate (Section 5.3 of [RECOVERY]).
+
+   A client MUST NOT reflect a sample after it has accepted
+   MAX_CHAIN_REFLECTIONS reflections of the current chain, where
+   MAX_CHAIN_REFLECTIONS is 8.  This ends the chain; the client can
+   start a new one in its place.  The limit bounds the effect of extra
+   samples that the acceptance rules cannot detect (Section 4.4).
+
+   A client can stop generating samples at any time, for example when
+   the connection is idle.  If it also stops reflecting, the current
+   chain ends.
+
+4.4.  Reflection
+
+   Each endpoint keeps, per path, the Sample ID of the current chain and
+   whether it is awaiting a sample, that is, whether it has sent a
+   sample of the current chain and not yet accepted one in return.
+
+   A server accepts a delay sample when:
+
+   *  its Sample ID differs from the current chain, in which case it
+      starts a new current chain;
+
+   *  its Sample ID matches the current chain and the server is awaiting
+      a sample; or
+
+   *  the server has no chain on this path, for example after a NAT
+      rebinding, in which case the sample's chain becomes current.
+
+   A client accepts a delay sample when its Sample ID matches the
+   current chain and the client is awaiting a sample.
+
+   Other samples are discarded without changing the chain state.  An
+   endpoint can also decline a sample that meets these conditions, for
+   example because of load; the chain then ends, and the client can
+   replace it after T_Max (Section 4.3).
+
+   Together with QUIC duplicate detection (Section 4.6), these rules
+   normally keep one sample in flight per chain, and let the client end
+   stale chains by not reflecting them.  A sample of an old chain that
+   reaches the server late costs at most one reflection if the server is
+   awaiting a sample, and the current chain if the server is holding
+   one.
+
+   The rules cannot detect a second sample with the current Sample ID,
+   for example one injected by an on-path element or a stale sample
+   whose Sample ID matches again after wrapping.  Two samples of the
+   same chain could then circulate.  Limiting each chain to
+   MAX_CHAIN_REFLECTIONS reflections (Section 4.3) bounds how long this
+   lasts.
+
+   An endpoint reflects an accepted sample in the first datagram it
+   sends on the same path that can carry it, within the limit in
+   Section 4.2.  The reflection copies the Sample ID and sets the
+   Response Delay to the code for the endpoint's response delay.  An
+   endpoint can hold a reflection longer, within the same limit, to mask
+   the RTT (Section 10.3).  If it accepts a sample of a new chain while
+   holding one, it reflects only the new one.  Endpoints record the time
+   they send each sample.
+
+   Reflections are only sent on the path on which the sample was
+   received.
+
+4.5.  Reflection Opportunities
+
+   Delay samples are only carried in datagrams that an endpoint sends
+   anyway.  An endpoint MUST NOT send a datagram, or send it earlier,
+   solely to carry a delay sample.  Delay samples therefore never
+   generate traffic and do not affect idle timeouts.  If the endpoint
+   does not send a datagram within MAX_RESPONSE_DELAY, the chain ends.
+
+   Endpoints SHOULD carry delay samples in datagrams that the peer will
+   respond to promptly when they have a choice, so that the peer has an
+   opportunity to reflect.  In QUIC versions 1 and 2, these are
+   datagrams containing ack-eliciting packets, which the peer
+   acknowledges within its max_ack_delay (Section 13.2.1 of [QUIC]).
+
+   The Delay bit [EXPLICIT-MEASUREMENTS] discards reflections delayed by
+   more than 1 ms.  Here, response delays up to MAX_RESPONSE_DELAY are
+   allowed because they are reported and subtracted.  Longer response
+   delays still reduce the measurement rate.
+
+4.6.  Receiving Delay Samples
+
+   A delay sample MUST be discarded unless another QUIC packet in the
+   same datagram is successfully processed.  A QUIC packet that is
+   discarded as a duplicate is not successfully processed, so endpoints
+   ignore duplicated delay samples.  This relies on the QUIC version
+   discarding duplicate packets, as QUIC versions 1 and 2 do
+   (Section 12.3 of [QUIC]); delay samples MUST NOT be used with
+   versions that do not.
+
+   An endpoint MAY measure the network RTT itself: the time between
+   sending a sample and accepting its reflection, minus the observer
+   estimate (Table 1) for the reflection's Response Delay.  The
+   endpoint's own response delay is not part of this interval.
+   Reflections with code 15 cannot be used.
+
+4.7.  Connection Migration
+
+   Delay sample state is per path.  After migrating, the client starts a
+   new chain once it is permitted to send on the new path.  Endpoints
+   discard chain state for paths that are no longer used.
+
+   Endpoints SHOULD NOT send delay samples on a path while the QUIC
+   version in use restricts sending on it, such as before path
+   validation in QUIC versions 1 and 2.  Delay samples count toward any
+   anti-amplification limit, such as that in Section 8.1 of [QUIC].
+
+5.  Observing Delay Samples
+
+   An observer identifies delay sample packets by the long header bit
+   (0x80) and the version 0xTBD3.  For each flow (UDP 4-tuple), it
+   records when it sees each sample along with its Sample ID and
+   Response Delay.  Observers do not modify delay samples.
+
+   Observers determine the direction of a sample from the 4-tuple.  No
+   measurement requires knowing which endpoint is the client.
+
+   Below, D denotes the observer estimate for a Response Delay code
+   (Table 1).  Each subtraction of D has an error of up to 1 ms.
+
+5.1.  Bidirectional Observers
+
+   An observer that sees both directions measures a component when it
+   sees a sample at time t2 following a sample of the same chain at time
+   t1 in the opposite direction:
+
+   component = t2 - t1 - D
+
+   where D is taken from the later sample.  This is the network
+   component toward the endpoint that the earlier sample was sent to.
+   The sum of two consecutive components is the network RTT.
+
+5.2.  Unidirectional Observers
+
+   Any observer can measure the RTT when it sees a sample at time t2
+   following a sample of the same chain at time t1 in the same
+   direction:
+
+   rtt = t2 - t1 - D
+
+   where D is taken from the later sample.  This subtracts the response
+   delay of the endpoint that sent the samples, but not that of the
+   endpoint they were sent to, whose response delay is carried in the
+   direction the observer does not see.  The result is the network RTT
+   plus up to MAX_RESPONSE_DELAY.
+
+5.3.  Validity of Measurements
+
+   Observers MUST only pair samples with the same Sample ID.  The
+   earlier sample of a pair can be the first sample of its chain; a
+   sample with a new Sample ID is never the later sample of a pair.
+
+   Observers SHOULD discard results where the later sample has Response
+   Delay 15.  Such a sample is either a reflection without a reported
+   response delay or a generated sample that the observer did not
+   recognize as starting a new chain.
+
+   A bidirectional observer expects samples of a chain to alternate in
+   direction.  A second sample in the same direction without one in
+   between indicates a duplicate or a missed sample, and the observer
+   cannot tell which.  It MUST NOT use either sample for a component,
+   and resumes with the next sample in the opposite direction.
+
+   Without a sequence number in the sample, observers cannot otherwise
+   detect duplicates or missed samples, and chains that an observer does
+   not see can bring the Sample ID back to the same value.  Observers
+   SHOULD discard pairs whose interval is implausible for the flow, for
+   example much shorter or much longer than recent measurements, while
+   still allowing for genuine changes in delay.
+
+   Observers MUST discard negative results, which indicate an incorrect
+   Response Delay or a mispairing.
+
+5.4.  Observer State
+
+   Per flow, an observer keeps the Sample ID of the current chain and,
+   per direction, the time and Response Delay of the most recent sample
+   of that chain, marked invalid when a repeat in the same direction is
+   detected.  A sample with a new Sample ID resets this state.
+
+6.  Delay Report Packets
+
+6.1.  Delay Report Packet Format
+
+   A delay report packet is a QUIC long header packet into which an
+   observer writes delay localization information for the receiver.
+
+   Delay Report Packet {
+     Header Form (1) = 1,
+     Reserved (1),
+     Upstream Delay Ratio (6),
+     Version (32) = 0xTBD4,
+     Destination Connection ID Length (8),
+     Destination Connection ID (0..2040),
+     Source Connection ID Length (8),
+     Source Connection ID (0..2040),
+   }
+
+                    Figure 3: Delay Report Packet Format
+
+   Header Form and Reserved:  As for delay sample packets (Section 4).
+
+   Upstream Delay Ratio:  A 6-bit value (0x3f).  Values 0 to 62
+      represent the fraction value/62 of the network RTT between the
+      report sender and the observer.  The value 63 means no observer
+      wrote the field; endpoints MUST send 63.
+
+   Version:  Set to 0xTBD4, identifying a POEM Delay report packet.
+
+   Destination Connection ID and Source Connection ID:  As for delay
+      sample packets (Section 4).
+
+   Delay report packets follow the same coalescing rules as delay sample
+   packets (Section 4).
+
+6.2.  Sending Delay Report Packets
+
+   Either endpoint MAY send delay reports.  Endpoints SHOULD NOT send
+   more than one per network round trip; one every 4 to 8 round trips is
+   RECOMMENDED.
+
+6.3.  Observing Delay Report Packets
+
+   An observer identifies delay report packets by the long header bit
+   (0x80) and the version 0xTBD4.
+
+   The upstream component is the one toward the endpoint that sent the
+   report.  An observer that has not measured both components MUST NOT
+   write the field.  Otherwise, when it sees a report, it MAY:
+
+   1.  Compute the upstream and downstream network components over
+       recent round trips, using consecutive component pairs from the
+       same chain.
+
+   2.  Compute ratio = upstream / (upstream + downstream) * 62, rounded
+       and clamped to 0-62.
+
+   3.  Write the ratio into the Upstream Delay Ratio field.
+
+   Observers SHOULD average over multiple round trips to reduce the
+   effect of transient queuing and response delay quantization.  The
+   method is up to the observer.
+
+   Any observer MAY overwrite the field.  As in POEM Loss [POEM], the
+   receiver sees the value from the last observer on the path.
+
+6.4.  Receiving Delay Report Packets
+
+   A delay report packet MUST be discarded unless another QUIC packet in
+   the same datagram is successfully processed.
+
+   A value of 63 means no observer wrote the field.  Otherwise, the
+   receiver can combine the ratio with its own network RTT measured from
+   delay samples (Section 4.6) over a similar period:
+
+   *  Component toward the report sender = network_rtt * ratio / 62
+
+   *  Component toward the receiver = network_rtt * (1 - ratio / 62)
+
+   An RTT estimate from QUIC loss recovery (Section 5 of [RECOVERY])
+   includes endpoint delay and would bias the result.
+
+   Receivers SHOULD average over multiple reports.  The receiver does
+   not know which network element wrote the ratio or where it is; see
+   Section 7.
+
+6.5.  Application Use
+
+   Applications can use delay localization to, for example:
+
+   *  distinguish access network delay from delay elsewhere on the path,
+
+   *  inform path selection when multiple network accesses are
+      available, or
+
+   *  provide diagnostics to users or operators.
+
+   How applications use this information is out of scope.
+
+7.  Applicability
+
+7.1.  Observer Location
+
+   As in POEM Loss [POEM], reports do not identify the observer or its
+   location.  Endpoints SHOULD NOT assume a particular observer
+   location.
+
+7.2.  Measurement Rate and Accuracy
+
+   One sample per chain is in flight.  A bidirectional observer gets at
+   most one component measurement per one-way trip, and any observer at
+   most one RTT measurement per round trip.  Sample loss and long
+   response delays reduce this rate.  Delay variation on timescales
+   shorter than the RTT cannot be measured.
+
+   The coarse Response Delay limits accuracy to about 1 ms per
+   subtracted response delay for individual measurements.  Averaging
+   reduces this error when response delays vary.
+
+7.3.  Bidirectional Requirement
+
+   Unlike POEM Loss, POEM Delay requires both endpoints to reflect
+   samples.  Component measurements, network RTT excluding both response
+   delays, and reports require an observer that sees both directions.
+   With asymmetric routing, observers measure an RTT that includes the
+   response delay of one endpoint.
+
+7.4.  Per-Flow Scope
+
+   Measurements apply to a single flow identified by the UDP 4-tuple.
+
+7.5.  Relationship to the Spin Bit
+
+   Delay samples and the spin bit are independent and can be used
+   together.  Observers can prefer delay sample measurements, which
+   largely exclude endpoint delay and tolerate reordering, and fall back
+   to the spin bit when none are recent; see Section 2.2.6 of
+   [EXPLICIT-MEASUREMENTS].
+
+8.  Negotiating POEM Delay
+
+   An endpoint indicates that it can receive and reflect delay samples
+   by including the poem_delay_supported transport parameter (0xTBD).
+
+   Endpoints MUST NOT send delay sample packets unless both endpoints
+   included the transport parameter.  An endpoint MAY send delay report
+   packets if its peer included it.
+
+   The transport parameter MUST be empty.  A non-zero length MUST be
+   treated as a connection error of type TRANSPORT_PARAMETER_ERROR.
+
+   This transport parameter is valid for QUIC versions 1 [QUIC] and 2
+   [QUICv2] and any other version that recognizes the versions and
+   transport parameters registries established in Sections 22.2 and 22.3
+   of [QUIC].
+
+   Endpoints MUST NOT remember the transport parameter for 0-RTT.  Delay
+   sample and delay report packets cannot be sent until the transport
+   parameter is received.
+
+9.  Security Considerations
+
+9.1.  On-Path Modification
+
+   Delay reports rely on on-path elements modifying packets, the same
+   trust model as SCONE [SCONE] and POEM Loss [POEM]: an element that
+   can modify packets can also drop or delay them.
+
+   Delay sample fields are not integrity protected.  An on-path element
+   can change the Response Delay to mislead other observers, or the
+   Sample ID to end the current chain or revive a stale one.  It can
+   also add a sample with the current Sample ID to a datagram, putting a
+   second sample in flight.  The effect is limited to incorrect or lost
+   measurements until the chain ends, which happens after at most
+   MAX_CHAIN_REFLECTIONS reflections by the client (Section 4.3).
+   Delaying packets has similar effects.
+
+9.2.  Fake Packets
+
+   Endpoints only accept delay samples and reports from datagrams
+   containing a successfully processed QUIC packet.  Off-path attackers
+   cannot construct such datagrams.
+
+9.3.  Misleading Reports
+
+   An observer can write misleading ratios.  Endpoints SHOULD treat
+   reports as advisory and compare them with their own measurements.
+
+9.4.  Falsified Delay Signals
+
+   Endpoints can falsify delay samples:
+
+   Inflated response delay:  Observers underestimate network delay,
+      possibly producing negative values that are discarded.
+
+   Deflated response delay:  Endpoint delay is attributed to the network
+      segment between the observer and that endpoint.
+
+   Extra samples:  Generating samples at a high rate or reflecting
+      samples that should not be accepted puts multiple samples in
+      flight, leading to meaningless measurements.
+
+   Observers cannot verify endpoint claims.  Network operators MUST NOT
+   use POEM Delay signals as the sole input to automated network policy,
+   assurance, or engineering decisions, and should compare measurements
+   from untrusted endpoints with other data.
+
+9.5.  Resource Use
+
+   Delay samples add a few bytes to about one datagram per one-way trip.
+   They are only carried in datagrams that would be sent anyway
+   (Section 4.5), so they do not generate traffic.
+
+10.  Privacy Considerations
+
+10.1.  Flow Identification
+
+   Delay sample and report packets add no flow identifiers beyond the
+   UDP 4-tuple and connection IDs.  Chain state is not carried across
+   paths, and a 2-bit Sample ID cannot meaningfully link paths.
+
+10.2.  Endpoint Roles
+
+   Only the client generates samples, so an observer that sees a new
+   Sample ID appear can identify the client.  Observers that see the
+   handshake already know this.  No measurement in this document uses
+   it.
+
+10.3.  Delay Exposure
+
+   Delay samples expose the connection RTT and, to bidirectional
+   observers, the RTT to each endpoint.  The spin bit already exposes
+   the RTT; [EXPLICIT-MEASUREMENTS] discusses the privacy implications,
+   including the limited value of RTT for geolocation.
+
+   The Response Delay exposes how long each endpoint holds a sample.  A
+   precise value would directly reveal endpoint-internal timing, such as
+   cryptographic processing time, scheduling, or load.  The 2 ms steps
+   (Table 1) avoid exposing variation below that scale directly, but do
+   not prevent inference.  Observers see the total time between samples,
+   which includes the precise response delay; where network delay is
+   stable, they can infer response delay variation from timing alone, as
+   with the spin bit and Delay bit.  Over many samples, network jitter
+   around step boundaries can also reveal detail finer than the steps,
+   and the code itself distinguishes processing paths that differ by
+   more than 2 ms.
+
+   Section 7.2 of [EXPLICIT-MEASUREMENTS] describes masking the RTT with
+   a random reflection delay that is kept constant across connections
+   for some time.  A client can do so by not including the added delay
+   in the Response Delay; observers then attribute it to the network on
+   the client side.  The added delay counts toward MAX_RESPONSE_DELAY.
+
+   Endpoints that do not want to expose their response delay can send
+   code 15.  Endpoints that do not want to expose delay information at
+   all can omit the transport parameter.
+
+11.  IANA Considerations
+
+   This document requests the following registrations.
+
+11.1.  POEM Delay Version Numbers
+
+   This document registers the following entries in the "QUIC Versions"
+   registry:
+
+   Value:  0xTBD3
+   Status:  permanent
+   Specification:  This document
+   Change Controller:  IETF (iesg@ietf.org)
+   Contact:  QUIC Working Group (quic@ietf.org)
+   Notes:  POEM Delay Sample Packet
+
+   Value:  0xTBD4
+   Status:  permanent
+   Specification:  This document
+   Change Controller:  IETF (iesg@ietf.org)
+   Contact:  QUIC Working Group (quic@ietf.org)
+   Notes:  POEM Delay Report Packet
+
+11.2.  poem_delay_supported Transport Parameter
+
+   This document registers the following entry in the "QUIC Transport
+   Parameters" registry:
+
+   Value:  0xTBD
+   Parameter Name:  poem_delay_supported
+   Status:  Permanent
+   Specification:  This document
+   Change Controller:  IETF (iesg@ietf.org)
+   Contact:  QUIC Working Group (quic@ietf.org)
+   Notes:  (none)
+
+12.  References
+
+12.1.  Normative References
+
+   [INVARIANTS]
+              Thomson, M., "Version-Independent Properties of QUIC",
+              RFC 8999, DOI 10.17487/RFC8999, May 2021,
+              <https://www.rfc-editor.org/rfc/rfc8999>.
+
+   [QUIC]     Iyengar, J., Ed. and M. Thomson, Ed., "QUIC: A UDP-Based
+              Multiplexed and Secure Transport", RFC 9000,
+              DOI 10.17487/RFC9000, May 2021,
+              <https://www.rfc-editor.org/rfc/rfc9000>.
+
+   [QUIC-BIT] Thomson, M., "Greasing the QUIC Bit", RFC 9287,
+              DOI 10.17487/RFC9287, August 2022,
+              <https://www.rfc-editor.org/rfc/rfc9287>.
+
+   [QUICv2]   Duke, M., "QUIC Version 2", RFC 9369,
+              DOI 10.17487/RFC9369, May 2023,
+              <https://www.rfc-editor.org/rfc/rfc9369>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+12.2.  Informative References
+
+   [EXPLICIT-MEASUREMENTS]
+              Cociglio, M., Ferrieux, A., Fioccola, G., Lubashev, I.,
+              Bulgarella, F., Nilo, M., Hamchaoui, I., and R. Sisto,
+              "Explicit Host-to-Network Flow Measurements Techniques",
+              RFC 9506, DOI 10.17487/RFC9506, October 2023,
+              <https://www.rfc-editor.org/rfc/rfc9506>.
+
+   [POEM]     Ihlar, L. M. and M. Kühlewind, "A Protocol for Periodic
+              On-path Explicit Measurement", Work in Progress, Internet-
+              Draft, draft-ihlar-poem-quic-01, 20 July 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ihlar-poem-
+              quic-01>.
+
+   [RECOVERY] Iyengar, J., Ed. and I. Swett, Ed., "QUIC Loss Detection
+              and Congestion Control", RFC 9002, DOI 10.17487/RFC9002,
+              May 2021, <https://www.rfc-editor.org/rfc/rfc9002>.
+
+   [SCONE]    Thomson, M., Huitema, C., Oku, K., Joras, M., and L. M.
+              Ihlar, "Standard Communication with Network Elements
+              (SCONE) Protocol", Work in Progress, Internet-Draft,
+              draft-ietf-scone-protocol-10, 28 October 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-scone-
+              protocol-10>.
+
+Appendix A.  Design Considerations
+
+A.1.  Differences from the Delay Bit
+
+   This protocol keeps the bouncing sample of the Delay bit
+   [EXPLICIT-MEASUREMENTS] with two changes:
+
+   *  The Sample ID prevents observers from pairing samples of different
+      chains.  T_Max is only used by the client to decide when to
+      generate a new chain.
+
+   *  A coarse response delay replaces the 1 ms reflection threshold.
+      Reflections can be held up to MAX_RESPONSE_DELAY, and measurements
+      largely exclude endpoint delay.
+
+A.2.  Signals in the First Octet
+
+   Like SCONE [SCONE] and POEM Loss [POEM], delay samples carry all
+   information in the low 6 bits of the first octet.  Additional fields
+   after the Source Connection ID would allow more information, at two
+   costs: they reduce the space available to the coalesced QUIC packet,
+   and observers would need to parse the variable-length connection IDs
+   to find them, which is costly for hardware and other constrained
+   forwarding paths.
+
+   The following extensions were considered and not included:
+
+   Reflection Count:  A counter incremented at each reflection would let
+      observers detect duplicated and missed samples and avoid
+      mispairing after the Sample ID wraps, replacing the timing
+      heuristics in Section 5.  With only 6 bits, a useful counter
+      leaves no room for the response delay.
+
+   Peer Response Delay:  A copy of the response delay from the sample
+      being reflected would let unidirectional observers subtract the
+      response delay of both endpoints.  Without it, unidirectional
+      measurements include the response delay of the far endpoint, up to
+      MAX_RESPONSE_DELAY (Section 5.2).
+
+   Fine-grained response delay:  A field with, for example,
+      8-microsecond resolution would remove the quantization error of up
+      to 1 ms per subtraction.  Besides expanding the packet, it would
+      directly expose endpoint-internal timing such as cryptographic
+      processing time (Section 10.3).  Coarse steps are an explicit
+      design choice to avoid this, although they do not prevent
+      inference from timing.
+
+A.3.  Response Delay Encoding
+
+   The 4-bit field uses uniform 2 ms steps up to MAX_RESPONSE_DELAY,
+   with one code reserved for "not reported".  Uniform steps give the
+   same maximum error and the same protection against timing exposure
+   across the range.  A logarithmic encoding would be more precise for
+   short response delays, which is where internal timing such as
+   cryptographic processing is most visible, and less precise for long
+   ones, which matter most for accuracy.
+
+   Code 15 lets endpoints participate without exposing their response
+   delay, and marks generated samples, which have no response delay.
+
+A.4.  Maximum Response Delay
+
+   Because reflections only use datagrams that would be sent anyway, the
+   response delay depends on the peer's traffic.  MAX_RESPONSE_DELAY
+   bounds it so that the client can choose T_Max without knowing the
+   version-specific acknowledgment behavior of the server. 30 ms covers
+   the default max_ack_delay of 25 ms in QUIC versions 1 and 2
+   (Section 18.2 of [QUIC]) and fits 15 steps of 2 ms, so a peer that
+   sends ack-eliciting packets typically receives an acknowledgment in
+   time for a reflection.  On application-limited flows, more chains end
+   at the limit and are replaced after T_Max.
+
+   Peers that use a larger max_ack_delay, or reduce acknowledgment
+   frequency, exceed the limit more often and lose more chains.  A fixed
+   limit is simpler than one advertised by each endpoint, for example in
+   the transport parameter, but does not adapt to such endpoints.
+
+A.5.  Chain Lifetime
+
+   Without a Reflection Count, endpoints cannot detect a second sample
+   with the current Sample ID.  Ending each chain after
+   MAX_CHAIN_REFLECTIONS reflections by the client bounds the effect of
+   such samples.  If the client starts a new chain in its place, the
+   cost is one component and one RTT measurement per chain, since a
+   generated sample cannot be the later sample of a pair.  With 8
+   reflections per chain, this is about one in eight measurements.
+
+A.6.  Report Content
+
+   The delay report carries a ratio rather than absolute delays, for
+   consistency with the POEM Loss report and because the receiver knows
+   the network RTT.  A future extension could report absolute component
+   delays, or separate base delay from queuing delay to help localize
+   queuing.
+
+Acknowledgments
+
+   This work builds on the Delay bit defined in [EXPLICIT-MEASUREMENTS]
+   and the communication model of the SCONE protocol [SCONE].
+
+Authors' Addresses
+
+   Marcus Ihlar
+   Ericsson
+   Email: marcus.ihlar@ericsson.com
+
+
+   Mirja Kühlewind
+   Ericsson
+   Email: mirja.kuehlewind@ericsson.com

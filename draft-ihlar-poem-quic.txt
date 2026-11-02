@@ -5,7 +5,7 @@
 SCONE                                                           M. Ihlar
 Internet-Draft                                              M. Kühlewind
 Intended status: Informational                                  Ericsson
-Expires: 21 January 2027                                    20 July 2026
+Expires: 6 May 2027                                      2 November 2026
 
 
           A Protocol for Periodic On-path Explicit Measurement
@@ -50,7 +50,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 21 January 2027.
+   This Internet-Draft will expire on 6 May 2027.
 
 Copyright Notice
 
@@ -811,9 +811,9 @@ Table of Contents
    [SCONE]    Thomson, M., Huitema, C., Oku, K., Joras, M., and L. M.
               Ihlar, "Standard Communication with Network Elements
               (SCONE) Protocol", Work in Progress, Internet-Draft,
-              draft-ietf-scone-protocol-05, 6 July 2026,
+              draft-ietf-scone-protocol-10, 28 October 2026,
               <https://datatracker.ietf.org/doc/html/draft-ietf-scone-
-              protocol-05>.
+              protocol-10>.
 
 Appendix A.  Design Considerations
 
