@@ -62,24 +62,34 @@ how network delay is split between the two sides of the observer.
 # Introduction
 
 QUIC {{QUIC}} encrypts the transport header fields that on-path
-observers use to measure delay for TCP. The QUIC spin bit
-({{Section 17.4 of QUIC}}) provides an RTT signal, but it is
-inaccurate under reordering, loss, and application-limited traffic.
+observers use to measure delay for TCP. This document defines POEM
+Delay, an explicit delay signal for QUIC. Like the existing signals,
+it trades accuracy against how often a measurement succeeds:
 
-The Delay bit {{EXPLICIT-MEASUREMENTS}} addresses these limitations
-with a single marked packet, the delay sample, that bounces between
-client and server. Observers that see one direction measure the RTT;
-observers that see both directions also measure the RTT to each
-endpoint.
+- The spin bit ({{Section 17.4 of QUIC}}) yields a measurement every
+  round trip for any traffic, but includes endpoint idle time, which
+  can be long when the application limits sending. Reordering and
+  loss cause further errors.
+
+- The Delay bit {{EXPLICIT-MEASUREMENTS}} uses a single marked packet,
+  the delay sample, that bounces between client and server. An
+  endpoint that cannot reflect the sample within 1 ms drops it, so
+  measurements are accurate, but many samples are dropped when the
+  application limits sending or when acknowledgments are delayed by
+  more than 1 ms.
+
+- POEM Delay keeps the accuracy of the Delay bit while more
+  measurements succeed. Endpoints can hold the sample up to 30 ms and
+  report the coarse response delay, which observers subtract.
 
 POEM Delay carries the delay sample in a QUIC long header packet
 coalesced with ordinary QUIC packets, following SCONE {{SCONE}} and
 the loss measurement protocol of {{POEM}}, called POEM Loss here. As
-in those protocols, all information is in the first octet, which
-adds two signals to the Delay bit:
+in those protocols, all information is in the first octet. Compared
+with the Delay bit, it adds:
 
-- a Sample ID, which keeps observers from pairing samples of
-  different chains, and
+- a Sample ID, which keeps observers from pairing unrelated samples,
+  such as a lost sample and its replacement, and
 
 - a coarse response delay, which observers subtract to measure
   network delay rather than network plus endpoint delay.
@@ -218,6 +228,11 @@ Source Connection ID Length and Source Connection ID:
 Delay sample packets MUST be coalesced with other QUIC packets and
 MUST be the first packet in the UDP datagram.
 
+As in SCONE {{SCONE}} and POEM Loss {{POEM}}, all signals are in the
+first octet. This leaves the space after the connection IDs to the
+coalesced QUIC packet and lets observers read the signals at a fixed
+offset, without parsing the variable-length connection IDs.
+
 SCONE packets and POEM Loss packets also need to be first, so a
 datagram carries at most one of these, a delay sample, or a delay
 report. A reflection that cannot go in the next datagram for this
@@ -246,21 +261,20 @@ The Response Delay field encodes the response delay in 2 ms steps:
 | 15    | Not reported          | (none)            |
 {: #tab-delay title="Response Delay Codes"}
 
-The coarse encoding is deliberate: a precise response delay would
-expose endpoint-internal timing, such as cryptographic processing
-time ({{privacy-delay}}).
+The 2 ms granularity balances measurement accuracy against exposure
+of endpoint-internal timing, such as cryptographic processing time
+({{privacy-delay}}).
 
 An endpoint MUST NOT reflect a sample if the response delay would
 reach MAX_RESPONSE_DELAY, which is 30 ms. The sample is dropped and
-the chain ends.
+the chain ends. This value covers the default max_ack_delay of 25 ms
+in QUIC versions 1 and 2 ({{Section 18.2 of QUIC}}), and a fixed
+limit lets the client choose T_Max ({{generation}}) without knowing
+the server's acknowledgment behavior.
 
 Generated samples carry code 15. An endpoint MAY also send code 15
 in a reflection, for example if it does not want to expose its
 response delay.
-
-No clock synchronization is needed: endpoints and observers each
-measure intervals on their own clock.
-
 
 ## Generation {#generation}
 
@@ -294,7 +308,9 @@ A client MUST NOT reflect a sample after accepting
 MAX_CHAIN_REFLECTIONS reflections of the current chain, where
 MAX_CHAIN_REFLECTIONS is 8. This ends the chain and bounds the effect
 of extra samples that the acceptance rules cannot detect
-({{reflection}}).
+({{reflection}}). If the client starts a new chain in its place,
+observers lose about one measurement per 8 round trips, since a
+generated sample is never the later sample of a pair.
 
 A client can stop generating at any time, for example when the
 connection is idle. If it also stops reflecting, the chain ends.
@@ -758,90 +774,6 @@ Notes:
 
 
 --- back
-
-# Design Considerations
-
-## Differences from the Delay Bit
-
-POEM Delay keeps the bouncing sample of the Delay bit
-{{EXPLICIT-MEASUREMENTS}} with two changes:
-
-- The Sample ID keeps observers from pairing samples of different
-  chains, so T_Max is only used by the client.
-
-- A coarse response delay replaces the 1 ms reflection threshold.
-  Reflections can be held up to MAX_RESPONSE_DELAY, because the delay
-  is reported and subtracted.
-
-## Signals in the First Octet {#first-octet}
-
-Like SCONE and POEM Loss, delay samples carry all information in the
-low 6 bits of the first octet. Fields after the Source Connection ID
-could carry more, but would reduce the space for the coalesced QUIC
-packet and require observers to parse the variable-length connection
-IDs, which is costly for hardware and other constrained forwarding
-paths. The following were considered and not included:
-
-Reflection Count:
-: A counter incremented at each reflection would let observers
-  detect duplicated and missed samples and avoid mispairing after the
-  Sample ID wraps, replacing the timing heuristics in
-  {{observing}}. A useful counter leaves no room in 6 bits for the
-  response delay.
-
-Peer Response Delay:
-: A copy of the response delay from the reflected sample would let
-  unidirectional observers subtract both endpoints' response delays.
-  Without it, their measurements include up to MAX_RESPONSE_DELAY of
-  the far endpoint's response delay ({{unidirectional}}).
-
-Fine-grained response delay:
-: Microsecond resolution would remove the quantization error of up to
-  1 ms per subtraction, but would expand the packet and directly
-  expose endpoint-internal timing such as cryptographic processing
-  time ({{privacy-delay}}). Coarse steps are a deliberate choice to
-  avoid this.
-
-## Response Delay Encoding
-
-Uniform 2 ms steps give the same maximum error and the same timing
-protection across the range. A logarithmic encoding would use finer
-steps for short response delays, exposing more of the timing the
-coarse encoding is meant to hide. Code 15 lets endpoints participate
-without exposing their response delay and marks generated samples.
-
-## Maximum Response Delay
-
-Because reflections only use datagrams that would be sent anyway, the
-response delay depends on the peer's traffic. A fixed
-MAX_RESPONSE_DELAY lets the client choose T_Max without knowing the
-server's acknowledgment behavior. 30 ms covers the default
-max_ack_delay of 25 ms in QUIC versions 1 and 2
-({{Section 18.2 of QUIC}}) and fits 15 steps of 2 ms.
-
-On application-limited flows, and with peers that use a larger
-max_ack_delay or reduce acknowledgment frequency, more chains end at
-the limit. A limit advertised by each endpoint, for example in the
-transport parameter, would adapt to such peers at the cost of
-complexity.
-
-## Chain Lifetime
-
-Without a Reflection Count, endpoints cannot detect a second sample
-with the current Sample ID. Ending each chain after
-MAX_CHAIN_REFLECTIONS client reflections bounds its effect. When the
-client starts a new chain in its place, observers lose about one
-measurement per 8 round trips, since a generated sample cannot be the
-later sample of a pair.
-
-## Report Content
-
-The delay report carries a ratio rather than absolute delays, for
-consistency with the POEM Loss report and because the receiver knows
-the network RTT. A future extension could report absolute component
-delays, or separate base delay from queuing delay to help localize
-queuing.
-
 
 # Acknowledgments
 {:numbered="false"}
