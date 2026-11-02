@@ -1833,10 +1833,9 @@ either for a component, and resumes with the next sample in the
 opposite direction.<a href="#section-5.3-3" class="pilcrow">¶</a></p>
 <p id="section-5.3-4">Otherwise, observers cannot detect duplicates or missed samples, and
 chains they do not see can bring the Sample ID back to the same
-value. Observers <span class="bcp14">SHOULD</span> discard pairs with implausible intervals, for
-example much shorter or longer than recent measurements, while still
-tracking genuine changes in delay. Observers <span class="bcp14">MUST</span> discard negative
-results.<a href="#section-5.3-4" class="pilcrow">¶</a></p>
+value. Observers therefore discard implausible results, such as
+negative values or intervals much shorter or longer than recent
+measurements.<a href="#section-5.3-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="observer-state">
