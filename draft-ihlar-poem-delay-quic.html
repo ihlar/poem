@@ -1312,33 +1312,10 @@ how network delay is split between the two sides of the observer.<a href="#secti
             </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
-            <p id="section-toc.1-1.13.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-design-considerations" class="internal xref">Design Considerations</a></p>
-<ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.1">
-                <p id="section-toc.1-1.13.2.1.1"><a href="#appendix-A.1" class="auto internal xref">A.1</a>.  <a href="#name-differences-from-the-delay-" class="internal xref">Differences from the Delay Bit</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.2">
-                <p id="section-toc.1-1.13.2.2.1"><a href="#appendix-A.2" class="auto internal xref">A.2</a>.  <a href="#name-signals-in-the-first-octet" class="internal xref">Signals in the First Octet</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.3">
-                <p id="section-toc.1-1.13.2.3.1"><a href="#appendix-A.3" class="auto internal xref">A.3</a>.  <a href="#name-response-delay-encoding" class="internal xref">Response Delay Encoding</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.4">
-                <p id="section-toc.1-1.13.2.4.1"><a href="#appendix-A.4" class="auto internal xref">A.4</a>.  <a href="#name-maximum-response-delay" class="internal xref">Maximum Response Delay</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.5">
-                <p id="section-toc.1-1.13.2.5.1"><a href="#appendix-A.5" class="auto internal xref">A.5</a>.  <a href="#name-chain-lifetime" class="internal xref">Chain Lifetime</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.6">
-                <p id="section-toc.1-1.13.2.6.1"><a href="#appendix-A.6" class="auto internal xref">A.6</a>.  <a href="#name-report-content" class="internal xref">Report Content</a></p>
-</li>
-            </ul>
+            <p id="section-toc.1-1.13.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
-            <p id="section-toc.1-1.14.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
-            <p id="section-toc.1-1.15.1"><a href="#appendix-C" class="auto internal xref"></a><a href="#name-authors-addresses" class="internal xref">Authors' Addresses</a></p>
+            <p id="section-toc.1-1.14.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-authors-addresses" class="internal xref">Authors' Addresses</a></p>
 </li>
         </ul>
 </nav>
@@ -1350,23 +1327,39 @@ how network delay is split between the two sides of the observer.<a href="#secti
 <a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
       </h2>
 <p id="section-1-1">QUIC <span>[<a href="#QUIC" class="cite xref">QUIC</a>]</span> encrypts the transport header fields that on-path
-observers use to measure delay for TCP. The QUIC spin bit
-(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-17.4" class="relref">Section 17.4</a> of [<a href="#QUIC" class="cite xref">QUIC</a>]</span>) provides an RTT signal, but it is
-inaccurate under reordering, loss, and application-limited traffic.<a href="#section-1-1" class="pilcrow">¶</a></p>
-<p id="section-1-2">The Delay bit <span>[<a href="#EXPLICIT-MEASUREMENTS" class="cite xref">EXPLICIT-MEASUREMENTS</a>]</span> addresses these limitations
-with a single marked packet, the delay sample, that bounces between
-client and server. Observers that see one direction measure the RTT;
-observers that see both directions also measure the RTT to each
-endpoint.<a href="#section-1-2" class="pilcrow">¶</a></p>
+observers use to measure delay for TCP. This document defines POEM
+Delay, an explicit delay signal for QUIC. Like the existing signals,
+it trades accuracy against how often a measurement succeeds:<a href="#section-1-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-1-2.1">
+          <p id="section-1-2.1.1">The spin bit (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-17.4" class="relref">Section 17.4</a> of [<a href="#QUIC" class="cite xref">QUIC</a>]</span>) yields a measurement every
+round trip for any traffic, but includes endpoint idle time, which
+can be long when the application limits sending. Reordering and
+loss cause further errors.<a href="#section-1-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-1-2.2">
+          <p id="section-1-2.2.1">The Delay bit <span>[<a href="#EXPLICIT-MEASUREMENTS" class="cite xref">EXPLICIT-MEASUREMENTS</a>]</span> uses a single marked packet,
+the delay sample, that bounces between client and server. An
+endpoint that cannot reflect the sample within 1 ms drops it, so
+measurements are accurate, but many samples are dropped when the
+application limits sending or when acknowledgments are delayed by
+more than 1 ms.<a href="#section-1-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-1-2.3">
+          <p id="section-1-2.3.1">POEM Delay keeps the accuracy of the Delay bit while more
+measurements succeed. Endpoints can hold the sample up to 30 ms and
+report the coarse response delay, which observers subtract.<a href="#section-1-2.3.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
 <p id="section-1-3">POEM Delay carries the delay sample in a QUIC long header packet
 coalesced with ordinary QUIC packets, following SCONE <span>[<a href="#SCONE" class="cite xref">SCONE</a>]</span> and
 the loss measurement protocol of <span>[<a href="#POEM" class="cite xref">POEM</a>]</span>, called POEM Loss here. As
-in those protocols, all information is in the first octet, which
-adds two signals to the Delay bit:<a href="#section-1-3" class="pilcrow">¶</a></p>
+in those protocols, all information is in the first octet. Compared
+with the Delay bit, it adds:<a href="#section-1-3" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-1-4.1">
-          <p id="section-1-4.1.1">a Sample ID, which keeps observers from pairing samples of
-different chains, and<a href="#section-1-4.1.1" class="pilcrow">¶</a></p>
+          <p id="section-1-4.1.1">a Sample ID, which keeps observers from pairing unrelated samples,
+such as a lost sample and its replacement, and<a href="#section-1-4.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-1-4.2">
           <p id="section-1-4.2.1">a coarse response delay, which observers subtract to measure
@@ -1561,12 +1554,16 @@ in the datagram, or empty if that packet has a short header.<a href="#section-4.
 </dl>
 <p id="section-4.1-4">Delay sample packets <span class="bcp14">MUST</span> be coalesced with other QUIC packets and
 <span class="bcp14">MUST</span> be the first packet in the UDP datagram.<a href="#section-4.1-4" class="pilcrow">¶</a></p>
-<p id="section-4.1-5">SCONE packets and POEM Loss packets also need to be first, so a
+<p id="section-4.1-5">As in SCONE <span>[<a href="#SCONE" class="cite xref">SCONE</a>]</span> and POEM Loss <span>[<a href="#POEM" class="cite xref">POEM</a>]</span>, all signals are in the
+first octet. This leaves the space after the connection IDs to the
+coalesced QUIC packet and lets observers read the signals at a fixed
+offset, without parsing the variable-length connection IDs.<a href="#section-4.1-5" class="pilcrow">¶</a></p>
+<p id="section-4.1-6">SCONE packets and POEM Loss packets also need to be first, so a
 datagram carries at most one of these, a delay sample, or a delay
 report. A reflection that cannot go in the next datagram for this
 reason is sent in a later one, and the wait counts as response
 delay. Endpoints <span class="bcp14">SHOULD NOT</span> add an optional packet of this kind, such
-as a delay report, to a datagram while a reflection is pending.<a href="#section-4.1-5" class="pilcrow">¶</a></p>
+as a delay report, to a datagram while a reflection is pending.<a href="#section-4.1-6" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="response-delay">
@@ -1623,17 +1620,18 @@ discarded if that packet is not successfully processed.<a href="#section-4.2-1" 
           </tbody>
         </table>
 </div>
-<p id="section-4.2-4">The coarse encoding is deliberate: a precise response delay would
-expose endpoint-internal timing, such as cryptographic processing
-time (<a href="#privacy-delay" class="auto internal xref">Section 10.3</a>).<a href="#section-4.2-4" class="pilcrow">¶</a></p>
+<p id="section-4.2-4">The 2 ms granularity balances measurement accuracy against exposure
+of endpoint-internal timing, such as cryptographic processing time
+(<a href="#privacy-delay" class="auto internal xref">Section 10.3</a>).<a href="#section-4.2-4" class="pilcrow">¶</a></p>
 <p id="section-4.2-5">An endpoint <span class="bcp14">MUST NOT</span> reflect a sample if the response delay would
 reach MAX_RESPONSE_DELAY, which is 30 ms. The sample is dropped and
-the chain ends.<a href="#section-4.2-5" class="pilcrow">¶</a></p>
+the chain ends. This value covers the default max_ack_delay of 25 ms
+in QUIC versions 1 and 2 (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-18.2" class="relref">Section 18.2</a> of [<a href="#QUIC" class="cite xref">QUIC</a>]</span>), and a fixed
+limit lets the client choose T_Max (<a href="#generation" class="auto internal xref">Section 4.3</a>) without knowing
+the server's acknowledgment behavior.<a href="#section-4.2-5" class="pilcrow">¶</a></p>
 <p id="section-4.2-6">Generated samples carry code 15. An endpoint <span class="bcp14">MAY</span> also send code 15
 in a reflection, for example if it does not want to expose its
 response delay.<a href="#section-4.2-6" class="pilcrow">¶</a></p>
-<p id="section-4.2-7">No clock synchronization is needed: endpoints and observers each
-measure intervals on their own clock.<a href="#section-4.2-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="generation">
@@ -1674,7 +1672,9 @@ versions 1 and 2 (<span><a href="https://rfc-editor.org/rfc/rfc9002#section-5.3"
 MAX_CHAIN_REFLECTIONS reflections of the current chain, where
 MAX_CHAIN_REFLECTIONS is 8. This ends the chain and bounds the effect
 of extra samples that the acceptance rules cannot detect
-(<a href="#reflection" class="auto internal xref">Section 4.4</a>).<a href="#section-4.3-5" class="pilcrow">¶</a></p>
+(<a href="#reflection" class="auto internal xref">Section 4.4</a>). If the client starts a new chain in its place,
+observers lose about one measurement per 8 round trips, since a
+generated sample is never the later sample of a pair.<a href="#section-4.3-5" class="pilcrow">¶</a></p>
 <p id="section-4.3-6">A client can stop generating at any time, for example when the
 connection is idle. If it also stops reflecting, the chain ends.<a href="#section-4.3-6" class="pilcrow">¶</a></p>
 </section>
@@ -2375,141 +2375,18 @@ Parameters" registry:<a href="#section-11.2-1" class="pilcrow">¶</a></p>
 </div>
 </section>
 </div>
-<div id="design-considerations">
-<section id="appendix-A">
-      <h2 id="name-design-considerations">
-<a href="#appendix-A" class="section-number selfRef">Appendix A. </a><a href="#name-design-considerations" class="section-name selfRef">Design Considerations</a>
-      </h2>
-<div id="differences-from-the-delay-bit">
-<section id="appendix-A.1">
-        <h3 id="name-differences-from-the-delay-">
-<a href="#appendix-A.1" class="section-number selfRef">A.1. </a><a href="#name-differences-from-the-delay-" class="section-name selfRef">Differences from the Delay Bit</a>
-        </h3>
-<p id="appendix-A.1-1">POEM Delay keeps the bouncing sample of the Delay bit
-<span>[<a href="#EXPLICIT-MEASUREMENTS" class="cite xref">EXPLICIT-MEASUREMENTS</a>]</span> with two changes:<a href="#appendix-A.1-1" class="pilcrow">¶</a></p>
-<ul class="normal">
-<li class="normal" id="appendix-A.1-2.1">
-            <p id="appendix-A.1-2.1.1">The Sample ID keeps observers from pairing samples of different
-chains, so T_Max is only used by the client.<a href="#appendix-A.1-2.1.1" class="pilcrow">¶</a></p>
-</li>
-          <li class="normal" id="appendix-A.1-2.2">
-            <p id="appendix-A.1-2.2.1">A coarse response delay replaces the 1 ms reflection threshold.
-Reflections can be held up to MAX_RESPONSE_DELAY, because the delay
-is reported and subtracted.<a href="#appendix-A.1-2.2.1" class="pilcrow">¶</a></p>
-</li>
-        </ul>
-</section>
-</div>
-<div id="first-octet">
-<section id="appendix-A.2">
-        <h3 id="name-signals-in-the-first-octet">
-<a href="#appendix-A.2" class="section-number selfRef">A.2. </a><a href="#name-signals-in-the-first-octet" class="section-name selfRef">Signals in the First Octet</a>
-        </h3>
-<p id="appendix-A.2-1">Like SCONE and POEM Loss, delay samples carry all information in the
-low 6 bits of the first octet. Fields after the Source Connection ID
-could carry more, but would reduce the space for the coalesced QUIC
-packet and require observers to parse the variable-length connection
-IDs, which is costly for hardware and other constrained forwarding
-paths. The following were considered and not included:<a href="#appendix-A.2-1" class="pilcrow">¶</a></p>
-<span class="break"></span><dl class="dlParallel" id="appendix-A.2-2">
-          <dt id="appendix-A.2-2.1">Reflection Count:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-A.2-2.2">
-            <p id="appendix-A.2-2.2.1">A counter incremented at each reflection would let observers
-detect duplicated and missed samples and avoid mispairing after the
-Sample ID wraps, replacing the timing heuristics in
-<a href="#observing" class="auto internal xref">Section 5</a>. A useful counter leaves no room in 6 bits for the
-response delay.<a href="#appendix-A.2-2.2.1" class="pilcrow">¶</a></p>
-</dd>
-          <dd class="break"></dd>
-<dt id="appendix-A.2-2.3">Peer Response Delay:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-A.2-2.4">
-            <p id="appendix-A.2-2.4.1">A copy of the response delay from the reflected sample would let
-unidirectional observers subtract both endpoints' response delays.
-Without it, their measurements include up to MAX_RESPONSE_DELAY of
-the far endpoint's response delay (<a href="#unidirectional" class="auto internal xref">Section 5.2</a>).<a href="#appendix-A.2-2.4.1" class="pilcrow">¶</a></p>
-</dd>
-          <dd class="break"></dd>
-<dt id="appendix-A.2-2.5">Fine-grained response delay:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-A.2-2.6">
-            <p id="appendix-A.2-2.6.1">Microsecond resolution would remove the quantization error of up to
-1 ms per subtraction, but would expand the packet and directly
-expose endpoint-internal timing such as cryptographic processing
-time (<a href="#privacy-delay" class="auto internal xref">Section 10.3</a>). Coarse steps are a deliberate choice to
-avoid this.<a href="#appendix-A.2-2.6.1" class="pilcrow">¶</a></p>
-</dd>
-        <dd class="break"></dd>
-</dl>
-</section>
-</div>
-<div id="response-delay-encoding">
-<section id="appendix-A.3">
-        <h3 id="name-response-delay-encoding">
-<a href="#appendix-A.3" class="section-number selfRef">A.3. </a><a href="#name-response-delay-encoding" class="section-name selfRef">Response Delay Encoding</a>
-        </h3>
-<p id="appendix-A.3-1">Uniform 2 ms steps give the same maximum error and the same timing
-protection across the range. A logarithmic encoding would use finer
-steps for short response delays, exposing more of the timing the
-coarse encoding is meant to hide. Code 15 lets endpoints participate
-without exposing their response delay and marks generated samples.<a href="#appendix-A.3-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="maximum-response-delay">
-<section id="appendix-A.4">
-        <h3 id="name-maximum-response-delay">
-<a href="#appendix-A.4" class="section-number selfRef">A.4. </a><a href="#name-maximum-response-delay" class="section-name selfRef">Maximum Response Delay</a>
-        </h3>
-<p id="appendix-A.4-1">Because reflections only use datagrams that would be sent anyway, the
-response delay depends on the peer's traffic. A fixed
-MAX_RESPONSE_DELAY lets the client choose T_Max without knowing the
-server's acknowledgment behavior. 30 ms covers the default
-max_ack_delay of 25 ms in QUIC versions 1 and 2
-(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-18.2" class="relref">Section 18.2</a> of [<a href="#QUIC" class="cite xref">QUIC</a>]</span>) and fits 15 steps of 2 ms.<a href="#appendix-A.4-1" class="pilcrow">¶</a></p>
-<p id="appendix-A.4-2">On application-limited flows, and with peers that use a larger
-max_ack_delay or reduce acknowledgment frequency, more chains end at
-the limit. A limit advertised by each endpoint, for example in the
-transport parameter, would adapt to such peers at the cost of
-complexity.<a href="#appendix-A.4-2" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="chain-lifetime">
-<section id="appendix-A.5">
-        <h3 id="name-chain-lifetime">
-<a href="#appendix-A.5" class="section-number selfRef">A.5. </a><a href="#name-chain-lifetime" class="section-name selfRef">Chain Lifetime</a>
-        </h3>
-<p id="appendix-A.5-1">Without a Reflection Count, endpoints cannot detect a second sample
-with the current Sample ID. Ending each chain after
-MAX_CHAIN_REFLECTIONS client reflections bounds its effect. When the
-client starts a new chain in its place, observers lose about one
-measurement per 8 round trips, since a generated sample cannot be the
-later sample of a pair.<a href="#appendix-A.5-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="report-content">
-<section id="appendix-A.6">
-        <h3 id="name-report-content">
-<a href="#appendix-A.6" class="section-number selfRef">A.6. </a><a href="#name-report-content" class="section-name selfRef">Report Content</a>
-        </h3>
-<p id="appendix-A.6-1">The delay report carries a ratio rather than absolute delays, for
-consistency with the POEM Loss report and because the receiver knows
-the network RTT. A future extension could report absolute component
-delays, or separate base delay from queuing delay to help localize
-queuing.<a href="#appendix-A.6-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-</section>
-</div>
 <div id="acknowledgments">
-<section id="appendix-B">
+<section id="appendix-A">
       <h2 id="name-acknowledgments">
 <a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
       </h2>
-<p id="appendix-B-1">This work builds on the Delay bit defined in
+<p id="appendix-A-1">This work builds on the Delay bit defined in
 <span>[<a href="#EXPLICIT-MEASUREMENTS" class="cite xref">EXPLICIT-MEASUREMENTS</a>]</span> and the communication model of the SCONE
-protocol <span>[<a href="#SCONE" class="cite xref">SCONE</a>]</span>.<a href="#appendix-B-1" class="pilcrow">¶</a></p>
+protocol <span>[<a href="#SCONE" class="cite xref">SCONE</a>]</span>.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="authors-addresses">
-<section id="appendix-C">
+<section id="appendix-B">
       <h2 id="name-authors-addresses">
 <a href="#name-authors-addresses" class="section-name selfRef">Authors' Addresses</a>
       </h2>
